@@ -43,6 +43,8 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
   useEffect(() => {
     const initializeData = async () => {
       if (open && account) {
+        console.log("🔵 [EditDialog] Iniciando carregamento, account.supplier_id:", account.supplier_id);
+        
         // Primeiro carregar os suppliers
         const { data: suppliersData, error } = await supabase
           .from("suppliers")
@@ -50,10 +52,12 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
           .order("name");
 
         if (error) {
-          console.error("Error loading suppliers:", error);
+          console.error("❌ [EditDialog] Error loading suppliers:", error);
           return;
         }
 
+        console.log("🟢 [EditDialog] Suppliers carregados:", suppliersData?.length, "suppliers");
+        console.log("🟢 [EditDialog] Suppliers IDs:", suppliersData?.map(s => s.id));
         setSuppliers(suppliersData || []);
 
         // Depois de carregar os suppliers, preencher o formData
@@ -69,18 +73,29 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
               : account.end_date.split('T')[0])
           : "";
         
-        setFormData({
+        const newFormData = {
           supplier_id: account.supplier_id || "",
           description: account.description || "",
           amount: account.amount?.toString() || "",
           issue_date: issueDate,
           end_date: endDate,
-        });
+        };
+        
+        console.log("🟡 [EditDialog] Definindo formData:", newFormData);
+        console.log("🟡 [EditDialog] supplier_id existe nos suppliers?", suppliersData?.some(s => s.id === account.supplier_id));
+        setFormData(newFormData);
       }
     };
 
     initializeData();
   }, [open, account]);
+
+  // Log quando suppliers ou formData mudarem
+  useEffect(() => {
+    console.log("📊 [EditDialog] Suppliers atualizado:", suppliers.length, "suppliers");
+    console.log("📊 [EditDialog] formData.supplier_id atual:", formData.supplier_id);
+    console.log("📊 [EditDialog] supplier_id existe em suppliers?", suppliers.some(s => s.id === formData.supplier_id));
+  }, [suppliers, formData.supplier_id]);
 
   const handleAddSupplier = async () => {
     if (!newSupplierName.trim()) {
@@ -172,9 +187,23 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
             <Label>Fornecedor</Label>
             {!showNewSupplier ? (
               <div className="flex gap-2">
+                {(() => {
+                  const selectedSupplier = suppliers.find(s => s.id === formData.supplier_id);
+                  console.log("🎨 [EditDialog] Renderizando Select:", {
+                    formDataSupplierId: formData.supplier_id,
+                    suppliersCount: suppliers.length,
+                    suppliersIds: suppliers.map(s => s.id),
+                    selectedSupplier: selectedSupplier?.name || "NÃO ENCONTRADO",
+                    open: open
+                  });
+                  return null;
+                })()}
                 <Select
                   value={formData.supplier_id}
-                  onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
+                  onValueChange={(value) => {
+                    console.log("🔄 [EditDialog] Select mudou para:", value);
+                    setFormData({ ...formData, supplier_id: value });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um fornecedor" />
