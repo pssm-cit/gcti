@@ -1,4 +1,4 @@
-# GCTI - Gestão de Contas
+# GCTI
 
 Sistema web profissional para gerenciamento de contas. Desenvolvido com React, TypeScript e Supabase para gerenciar contas a pagar, fornecedores e histórico financeiro.
 

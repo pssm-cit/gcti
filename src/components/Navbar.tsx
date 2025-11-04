@@ -27,7 +27,7 @@ export function Navbar() {
           <Link to="/" className="flex items-center gap-2">
             <FileText className="w-6 h-6 text-primary" />
             <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              FinanceFlow
+              GCTI
             </h1>
           </Link>
           

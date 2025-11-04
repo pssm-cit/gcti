@@ -130,7 +130,7 @@ export default function Auth() {
               <FileText className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">FinanceFlow</CardTitle>
+          <CardTitle className="text-2xl font-bold">GCTI</CardTitle>
           <CardDescription>Gestão de Contas Financeiras</CardDescription>
         </CardHeader>
         <CardContent>
