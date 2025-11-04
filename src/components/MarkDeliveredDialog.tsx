@@ -51,7 +51,9 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
 
     setLoading(true);
 
-    const currentMonth = format(new Date(), "yyyy-MM");
+    // Usar o período do card (account.__period) ao invés do mês atual
+    // Se não tiver __period, usar o mês atual como fallback
+    const paidMonth = account.__period || format(new Date(), "yyyy-MM");
     const currentDate = format(new Date(), "yyyy-MM-dd");
 
     // Obter user_id
@@ -62,32 +64,28 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
       return;
     }
 
-    // Atualizar conta
-    const { error: updateError } = await supabase
-      .from("accounts")
-      .update({
-        is_delivered: true,
-        delivered_at: new Date().toISOString(),
-        invoice_numbers: validInvoices,
-        recipient: recipient,
-        last_paid_month: currentMonth,
-      })
-      .eq("id", account.id);
+    // Verificar se já existe pagamento para este mês
+    const { data: existingPayment } = await supabase
+      .from("account_payment_history")
+      .select("id")
+      .eq("account_id", account.id)
+      .eq("paid_month", paidMonth)
+      .single();
 
-    if (updateError) {
-      toast.error("Erro ao marcar como entregue");
-      console.error(updateError);
+    if (existingPayment) {
+      toast.error("Este mês já foi marcado como pago");
       setLoading(false);
       return;
     }
 
+    // Não atualizar a conta original - apenas salvar no histórico
     // Salvar no histórico de pagamentos
     const { error: historyError } = await supabase
       .from("account_payment_history")
       .insert({
         account_id: account.id,
         user_id: user.id,
-        paid_month: currentMonth,
+        paid_month: paidMonth,
         paid_date: currentDate,
         invoice_numbers: validInvoices,
         recipient: recipient,
@@ -95,8 +93,10 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
       });
 
     if (historyError) {
-      console.error("Erro ao salvar histórico de pagamento:", historyError);
-      // Não bloquear a operação se o histórico falhar, mas logar o erro
+      toast.error("Erro ao salvar histórico de pagamento");
+      console.error(historyError);
+      setLoading(false);
+      return;
     }
 
     setLoading(false);

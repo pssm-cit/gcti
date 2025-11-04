@@ -73,7 +73,7 @@ export default function Index() {
     };
 
     // Carregar todas as contas que devem aparecer (data_fim NULL ou >= hoje)
-    const { data, error } = await supabase
+    const { data: accountsData, error: accountsError } = await supabase
       .from("accounts")
       .select(`
         *,
@@ -85,44 +85,108 @@ export default function Index() {
       .or(`data_fim.is.null,data_fim.gte.${today}`)
       .order("dia_vencimento", { ascending: true });
 
-    if (error) {
+    if (accountsError) {
       toast.error("Erro ao carregar contas");
-      console.error(error);
+      console.error(accountsError);
       return;
     }
 
-    // Expandir contas pendentes em cartões "virtuais" para mês anterior e mês atual, quando aplicável
-    const baseAccounts = data || [];
+    // Carregar histórico de pagamentos para filtrar meses já pagos
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: paymentHistory, error: historyError } = await supabase
+      .from("account_payment_history")
+      .select("account_id, paid_month, invoice_numbers, recipient, paid_date")
+      .eq("user_id", user.id);
+
+    if (historyError) {
+      console.error("Erro ao carregar histórico de pagamentos:", historyError);
+    }
+
+    // Criar mapa de meses pagos por conta: account_id -> Set de meses pagos
+    const paidMonthsMap = new Map<string, Set<string>>();
+    if (paymentHistory) {
+      paymentHistory.forEach((payment: any) => {
+        if (!paidMonthsMap.has(payment.account_id)) {
+          paidMonthsMap.set(payment.account_id, new Set());
+        }
+        paidMonthsMap.get(payment.account_id)?.add(payment.paid_month);
+      });
+    }
+
+    // Expandir contas em cards para todos os meses desde criação até hoje
+    const baseAccounts = accountsData || [];
     const expandedAccounts: any[] = [];
 
     for (const account of baseAccounts) {
-      if (!account.is_delivered) {
-        // Card do mês atual
-        const currentDueDate = computeDueDate(now.getFullYear(), now.getMonth(), account.dia_vencimento);
-        expandedAccounts.push({ ...account, __dueDate: currentDueDate.toISOString(), __period: currentMonthStr });
+      const createdAt = account.created_at ? new Date(account.created_at) : new Date();
+      const createdMonth = new Date(createdAt.getFullYear(), createdAt.getMonth(), 1);
+      const endDate = account.data_fim ? new Date(account.data_fim) : null;
+      const endMonth = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), 1) : null;
+      const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        // Card do mês anterior, se a recorrência já existia no mês anterior
-        const createdAt = account.created_at ? new Date(account.created_at) : null;
-        const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const hadPreviousCycle = createdAt ? createdAt < startOfCurrentMonth : true;
-        const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const prevMonthStr = format(prev, "yyyy-MM");
-        if (hadPreviousCycle) {
-          const prevDueDate = computeDueDate(prev.getFullYear(), prev.getMonth(), account.dia_vencimento);
-          expandedAccounts.push({ ...account, __dueDate: prevDueDate.toISOString(), __period: prevMonthStr, __isPreviousMonth: true });
+      // Obter meses pagos para esta conta
+      const paidMonths = paidMonthsMap.get(account.id) || new Set<string>();
+
+      // Gerar cards para cada mês desde criação até hoje (ou data_fim)
+      let monthCursor = new Date(createdMonth);
+      while (monthCursor <= currentMonth && (!endMonth || monthCursor <= endMonth)) {
+        const monthStr = format(monthCursor, "yyyy-MM");
+        
+        // Pular meses já pagos
+        if (!paidMonths.has(monthStr)) {
+          const dueDate = computeDueDate(
+            monthCursor.getFullYear(),
+            monthCursor.getMonth(),
+            account.dia_vencimento
+          );
+          
+          const isPreviousMonth = monthStr < currentMonthStr;
+          
+          expandedAccounts.push({
+            ...account,
+            __dueDate: dueDate.toISOString(),
+            __period: monthStr,
+            __isPreviousMonth: isPreviousMonth,
+            __isPaid: false
+          });
+        } else {
+          // Meses pagos aparecem como entregues
+          const dueDate = computeDueDate(
+            monthCursor.getFullYear(),
+            monthCursor.getMonth(),
+            account.dia_vencimento
+          );
+          
+          // Buscar dados do pagamento no histórico
+          const paymentData = paymentHistory?.find(
+            (p: any) => p.account_id === account.id && p.paid_month === monthStr
+          );
+          
+          expandedAccounts.push({
+            ...account,
+            __dueDate: dueDate.toISOString(),
+            __period: monthStr,
+            __isPreviousMonth: monthStr < currentMonthStr,
+            __isPaid: true,
+            invoice_numbers: paymentData?.invoice_numbers || account.invoice_numbers,
+            recipient: paymentData?.recipient || account.recipient,
+            delivered_at: paymentData?.paid_date || account.delivered_at
+          });
         }
-      } else {
-        // Entregues permanecem como 1 card (sem duplicar)
-        expandedAccounts.push(account);
+
+        // Avançar para o próximo mês
+        monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1);
       }
     }
 
     // Separar após expansão
-    const pendingAccounts = expandedAccounts.filter(acc => !acc.is_delivered);
-    const deliveredAccounts = expandedAccounts.filter(acc => acc.is_delivered);
+    const pendingAccounts = expandedAccounts.filter(acc => !acc.__isPaid);
+    const deliveredAccounts = expandedAccounts.filter(acc => acc.__isPaid);
 
-    // Identificar pendências de meses anteriores: os virtuais marcados ou período < mês atual
-    const previousMonthPendencies = pendingAccounts.filter(acc => acc.__isPreviousMonth || (acc.__period && acc.__period < currentMonthStr));
+    // Identificar pendências de meses anteriores: período < mês atual
+    const previousMonthPendencies = pendingAccounts.filter(acc => acc.__period && acc.__period < currentMonthStr);
 
     // Pendências do mês atual: período == mês atual
     const currentMonthPendencies = pendingAccounts.filter(acc => acc.__period === currentMonthStr);
@@ -136,7 +200,13 @@ export default function Index() {
 
     previousMonthPendencies.sort(sortByDueDay);
     currentMonthPendencies.sort(sortByDueDay);
-    deliveredAccounts.sort(sortByDueDay);
+    deliveredAccounts.sort((a, b) => {
+      // Ordenar entregues por período (mais recente primeiro)
+      if (a.__period && b.__period) {
+        return b.__period.localeCompare(a.__period);
+      }
+      return sortByDueDay(a, b);
+    });
 
     // Combinar: pendências anteriores primeiro, depois pendências do mês atual, depois entregues
     const sortedAccounts = [
@@ -194,7 +264,7 @@ export default function Index() {
             {/* Pendências de meses anteriores */}
             {accounts.filter(acc => {
               const currentMonth = format(new Date(), "yyyy-MM");
-              return !acc.is_delivered && acc.last_paid_month && acc.last_paid_month < currentMonth;
+              return !acc.__isPaid && acc.__period && acc.__period < currentMonth;
             }).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-destructive">
@@ -204,11 +274,11 @@ export default function Index() {
                   {accounts
                     .filter(acc => {
                       const currentMonth = format(new Date(), "yyyy-MM");
-                      return !acc.is_delivered && acc.last_paid_month && acc.last_paid_month < currentMonth;
+                      return !acc.__isPaid && acc.__period && acc.__period < currentMonth;
                     })
-                    .map((account) => (
+                    .map((account, index) => (
                       <AccountCard 
-                        key={account.id} 
+                        key={`${account.id}-${account.__period}-${index}`} 
                         account={account}
                         onUpdate={loadAccounts}
                       />
@@ -220,7 +290,7 @@ export default function Index() {
             {/* Pendências do mês atual */}
             {accounts.filter(acc => {
               const currentMonth = format(new Date(), "yyyy-MM");
-              return !acc.is_delivered && (!acc.last_paid_month || acc.last_paid_month === currentMonth);
+              return !acc.__isPaid && acc.__period === currentMonth;
             }).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">
@@ -230,11 +300,11 @@ export default function Index() {
                   {accounts
                     .filter(acc => {
                       const currentMonth = format(new Date(), "yyyy-MM");
-                      return !acc.is_delivered && (!acc.last_paid_month || acc.last_paid_month === currentMonth);
+                      return !acc.__isPaid && acc.__period === currentMonth;
                     })
-                    .map((account) => (
+                    .map((account, index) => (
                       <AccountCard 
-                        key={account.id} 
+                        key={`${account.id}-${account.__period}-${index}`} 
                         account={account}
                         onUpdate={loadAccounts}
                       />
@@ -244,17 +314,17 @@ export default function Index() {
             )}
 
             {/* Faturas entregues */}
-            {accounts.filter(acc => acc.is_delivered).length > 0 && (
+            {accounts.filter(acc => acc.__isPaid).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
                   Entregues
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {accounts
-                    .filter(acc => acc.is_delivered)
-                    .map((account) => (
+                    .filter(acc => acc.__isPaid)
+                    .map((account, index) => (
                       <AccountCard 
-                        key={account.id} 
+                        key={`${account.id}-${account.__period}-${index}`} 
                         account={account}
                         onUpdate={loadAccounts}
                       />

@@ -41,11 +41,12 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
   };
   
   const dueDate = getCurrentMonthDueDate();
-  const isOverdue = isPast(dueDate) && !isToday(dueDate) && !account.is_delivered;
-  const isDueToday = isToday(dueDate) && !account.is_delivered;
+  const isPaid = account.__isPaid === true;
+  const isOverdue = isPast(dueDate) && !isToday(dueDate) && !isPaid;
+  const isDueToday = isToday(dueDate) && !isPaid;
 
   const getStatusBadge = () => {
-    if (account.is_delivered) {
+    if (isPaid) {
       return <Badge className="bg-success text-success-foreground">Entregue</Badge>;
     }
     if (isOverdue) {
@@ -79,9 +80,16 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
       >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Building2 className="w-4 h-4" />
-              {account.suppliers?.name}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Building2 className="w-4 h-4" />
+                {account.suppliers?.name}
+              </div>
+              {account.__period && (
+                <div className="text-xs text-muted-foreground font-medium">
+                  {format(new Date(account.__period + "-01"), "MMMM 'de' yyyy", { locale: ptBR })}
+                </div>
+              )}
             </div>
             {getStatusBadge()}
           </div>
@@ -114,7 +122,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
           )}
         </CardContent>
 
-        {!account.is_delivered && (
+        {!isPaid && (
           <CardFooter>
             <Button 
               className="w-full" 
@@ -127,7 +135,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
           </CardFooter>
         )}
 
-        {account.is_delivered && account.invoice_numbers && (
+        {isPaid && account.invoice_numbers && (
           <CardFooter className="flex-col items-start">
             <p className="text-xs text-muted-foreground mb-1">
               NF: {account.invoice_numbers.join(", ")}
