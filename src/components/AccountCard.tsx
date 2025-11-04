@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Calendar, DollarSign, Building2 } from "lucide-react";
 import { useState } from "react";
 import { MarkDeliveredDialog } from "./MarkDeliveredDialog";
+import { EditAccountDialog } from "./EditAccountDialog";
 import { format, parseISO, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -13,7 +14,8 @@ interface AccountCardProps {
 }
 
 export function AccountCard({ account, onUpdate }: AccountCardProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [markDeliveredDialogOpen, setMarkDeliveredDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   
   const dueDate = parseISO(account.due_date);
   const isOverdue = isPast(dueDate) && !isToday(dueDate) && !account.is_delivered;
@@ -32,9 +34,26 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
     return <Badge variant="secondary">Pendente</Badge>;
   };
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Não abrir o diálogo se clicar no botão ou em elementos interativos
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
+    setEditDialogOpen(true);
+  };
+
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevenir que o clique no botão abra o diálogo de edição
+    setMarkDeliveredDialogOpen(true);
+  };
+
   return (
     <>
-      <Card className="transition-all hover:shadow-lg">
+      <Card 
+        className="transition-all hover:shadow-lg cursor-pointer" 
+        onClick={handleCardClick}
+      >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -77,7 +96,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
             <Button 
               className="w-full" 
               variant="outline"
-              onClick={() => setDialogOpen(true)}
+              onClick={handleButtonClick}
             >
               <CheckCircle2 className="w-4 h-4 mr-2" />
               Marcar como Entregue
@@ -100,8 +119,14 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
       </Card>
 
       <MarkDeliveredDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        open={markDeliveredDialogOpen}
+        onOpenChange={setMarkDeliveredDialogOpen}
+        account={account}
+        onSuccess={onUpdate}
+      />
+      <EditAccountDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
         account={account}
         onSuccess={onUpdate}
       />
