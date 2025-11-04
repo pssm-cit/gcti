@@ -45,7 +45,6 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
     const initializeData = async () => {
       if (open && account) {
         setIsInitialized(false);
-        console.log("🔵 [EditDialog] Iniciando carregamento, account.supplier_id:", account.supplier_id);
         
         // Primeiro carregar os suppliers
         const { data: suppliersData, error } = await supabase
@@ -54,12 +53,9 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
           .order("name");
 
         if (error) {
-          console.error("❌ [EditDialog] Error loading suppliers:", error);
+          console.error("Error loading suppliers:", error);
           return;
         }
-
-        console.log("🟢 [EditDialog] Suppliers carregados:", suppliersData?.length, "suppliers");
-        console.log("🟢 [EditDialog] Suppliers IDs:", suppliersData?.map(s => s.id));
         
         // Primeiro definir os suppliers
         setSuppliers(suppliersData || []);
@@ -88,8 +84,6 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
           end_date: endDate,
         };
         
-        console.log("🟡 [EditDialog] Definindo formData:", newFormData);
-        console.log("🟡 [EditDialog] supplier_id existe nos suppliers?", suppliersData?.some(s => s.id === account.supplier_id));
         setFormData(newFormData);
         setIsInitialized(true);
       } else {
@@ -108,13 +102,6 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
 
     initializeData();
   }, [open, account]);
-
-  // Log quando suppliers ou formData mudarem
-  useEffect(() => {
-    console.log("📊 [EditDialog] Suppliers atualizado:", suppliers.length, "suppliers");
-    console.log("📊 [EditDialog] formData.supplier_id atual:", formData.supplier_id);
-    console.log("📊 [EditDialog] supplier_id existe em suppliers?", suppliers.some(s => s.id === formData.supplier_id));
-  }, [suppliers, formData.supplier_id]);
 
   const handleAddSupplier = async () => {
     if (!newSupplierName.trim()) {
@@ -205,29 +192,17 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
           <div className="space-y-2">
             <Label>Fornecedor</Label>
             {!showNewSupplier ? (
-              <div className="flex gap-2">
-                {(() => {
-                  const selectedSupplier = suppliers.find(s => s.id === formData.supplier_id);
-                  console.log("🎨 [EditDialog] Renderizando Select:", {
-                    formDataSupplierId: formData.supplier_id,
-                    suppliersCount: suppliers.length,
-                    suppliersIds: suppliers.map(s => s.id),
-                    selectedSupplier: selectedSupplier?.name || "NÃO ENCONTRADO",
-                    open: open
-                  });
-                  return null;
-                })()}
-                                 <Select
-                  key={`select-${suppliers.length}-${formData.supplier_id}`}
-                  value={formData.supplier_id || undefined}
-                  onValueChange={(value) => {
-                    console.log("🔄 [EditDialog] Select mudou para:", value);
-                    if (value && value !== formData.supplier_id) {
-                      setFormData({ ...formData, supplier_id: value });
-                    }
-                  }}
-                  disabled={!isInitialized || suppliers.length === 0}
-                >
+                             <div className="flex gap-2">
+                 <Select
+                   key={`select-${suppliers.length}-${formData.supplier_id}`}
+                   value={formData.supplier_id || undefined}
+                   onValueChange={(value) => {
+                     if (value && value !== formData.supplier_id) {
+                       setFormData({ ...formData, supplier_id: value });
+                     }
+                   }}
+                   disabled={!isInitialized || suppliers.length === 0}
+                 >
                   <SelectTrigger>
                     <SelectValue placeholder={isInitialized ? "Selecione um fornecedor" : "Carregando..."} />
                   </SelectTrigger>
