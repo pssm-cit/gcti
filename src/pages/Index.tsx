@@ -167,7 +167,7 @@ export default function Index() {
             {/* Pendências de meses anteriores */}
             {accounts.filter(acc => {
               const currentMonth = format(new Date(), "yyyy-MM");
-              return !acc.is_delivered && (acc.last_paid_month === null || acc.last_paid_month < currentMonth);
+              return !acc.is_delivered && acc.last_paid_month && acc.last_paid_month < currentMonth;
             }).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-destructive">
@@ -177,7 +177,7 @@ export default function Index() {
                   {accounts
                     .filter(acc => {
                       const currentMonth = format(new Date(), "yyyy-MM");
-                      return !acc.is_delivered && (acc.last_paid_month === null || acc.last_paid_month < currentMonth);
+                      return !acc.is_delivered && acc.last_paid_month && acc.last_paid_month < currentMonth;
                     })
                     .map((account) => (
                       <AccountCard 
@@ -193,7 +193,7 @@ export default function Index() {
             {/* Pendências do mês atual */}
             {accounts.filter(acc => {
               const currentMonth = format(new Date(), "yyyy-MM");
-              return !acc.is_delivered && acc.last_paid_month === currentMonth;
+              return !acc.is_delivered && (!acc.last_paid_month || acc.last_paid_month === currentMonth);
             }).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">
@@ -203,7 +203,7 @@ export default function Index() {
                   {accounts
                     .filter(acc => {
                       const currentMonth = format(new Date(), "yyyy-MM");
-                      return !acc.is_delivered && acc.last_paid_month === currentMonth;
+                      return !acc.is_delivered && (!acc.last_paid_month || acc.last_paid_month === currentMonth);
                     })
                     .map((account) => (
                       <AccountCard 
@@ -220,7 +220,7 @@ export default function Index() {
             {accounts.filter(acc => acc.is_delivered).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
-                  Entregues/Pagas
+                  Entregues
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {accounts
