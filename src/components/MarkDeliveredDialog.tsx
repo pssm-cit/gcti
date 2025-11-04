@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
+import { format } from "date-fns";
 
 interface MarkDeliveredDialogProps {
   open: boolean;
@@ -50,25 +51,57 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
 
     setLoading(true);
 
-    const { error } = await supabase
+    const currentMonth = format(new Date(), "yyyy-MM");
+    const currentDate = format(new Date(), "yyyy-MM-dd");
+
+    // Obter user_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Erro: usuário não autenticado");
+      setLoading(false);
+      return;
+    }
+
+    // Atualizar conta
+    const { error: updateError } = await supabase
       .from("accounts")
       .update({
         is_delivered: true,
         delivered_at: new Date().toISOString(),
         invoice_numbers: validInvoices,
         recipient: recipient,
+        last_paid_month: currentMonth,
       })
       .eq("id", account.id);
 
-    setLoading(false);
-
-    if (error) {
+    if (updateError) {
       toast.error("Erro ao marcar como entregue");
-      console.error(error);
+      console.error(updateError);
+      setLoading(false);
       return;
     }
 
-    toast.success("Conta marcada como entregue!");
+    // Salvar no histórico de pagamentos
+    const { error: historyError } = await supabase
+      .from("account_payment_history")
+      .insert({
+        account_id: account.id,
+        user_id: user.id,
+        paid_month: currentMonth,
+        paid_date: currentDate,
+        invoice_numbers: validInvoices,
+        recipient: recipient,
+        amount: account.amount,
+      });
+
+    if (historyError) {
+      console.error("Erro ao salvar histórico de pagamento:", historyError);
+      // Não bloquear a operação se o histórico falhar, mas logar o erro
+    }
+
+    setLoading(false);
+
+    toast.success("Fatura marcada como paga!");
     onSuccess();
     onOpenChange(false);
     setInvoiceNumbers([""]);

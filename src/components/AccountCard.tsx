@@ -5,7 +5,7 @@ import { CheckCircle2, Calendar, DollarSign, Building2 } from "lucide-react";
 import { useState } from "react";
 import { MarkDeliveredDialog } from "./MarkDeliveredDialog";
 import { EditAccountDialog } from "./EditAccountDialog";
-import { format, parseISO, isPast, isToday } from "date-fns";
+import { format, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface AccountCardProps {
@@ -17,7 +17,27 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
   const [markDeliveredDialogOpen, setMarkDeliveredDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   
-  const dueDate = parseISO(account.due_date);
+  // Calcular data de vencimento para o mês atual baseado em dia_vencimento
+  const getCurrentMonthDueDate = () => {
+    if (!account.dia_vencimento) {
+      // Fallback para contas antigas que ainda usam due_date
+      return account.due_date ? new Date(account.due_date) : new Date();
+    }
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const dueDay = parseInt(account.dia_vencimento) || 1;
+    
+    // Criar data de vencimento no mês atual
+    // Usar o último dia do mês se dia_vencimento for maior que os dias do mês
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const actualDueDay = Math.min(dueDay, daysInMonth);
+    
+    return new Date(currentYear, currentMonth, actualDueDay);
+  };
+  
+  const dueDate = getCurrentMonthDueDate();
   const isOverdue = isPast(dueDate) && !isToday(dueDate) && !account.is_delivered;
   const isDueToday = isToday(dueDate) && !account.is_delivered;
 
@@ -84,9 +104,9 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
             </span>
           </div>
 
-          {account.end_date && (
+          {account.data_fim && (
             <div className="text-xs text-muted-foreground">
-              Data fim: {format(parseISO(account.end_date), "dd/MM/yyyy")}
+              Data fim: {format(new Date(account.data_fim), "dd/MM/yyyy")}
             </div>
           )}
         </CardContent>

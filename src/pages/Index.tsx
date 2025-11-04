@@ -8,6 +8,8 @@ import { AddAccountDialog } from "@/components/AddAccountDialog";
 import { AccountCard } from "@/components/AccountCard";
 import type { Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -38,12 +40,31 @@ export default function Index() {
   useEffect(() => {
     if (session) {
       loadAccounts();
+      
+      // Verificar e resetar status quando necessário (ao montar e ao mudar de mês)
+      resetRecurringAccountsStatus();
     }
   }, [session]);
 
+  // Função para resetar status de contas recorrentes quando mudar de mês
+  const resetRecurringAccountsStatus = async () => {
+    try {
+      // Chamar a função do banco de dados que reseta o status
+      const { error } = await supabase.rpc('reset_recurring_accounts_status');
+      
+      if (error) {
+        console.error("Erro ao resetar status de contas recorrentes:", error);
+      }
+    } catch (error) {
+      console.error("Erro ao resetar status:", error);
+    }
+  };
+
   const loadAccounts = async () => {
     const today = new Date().toISOString().split('T')[0];
+    const currentMonth = format(new Date(), "yyyy-MM");
     
+    // Carregar todas as contas que devem aparecer (data_fim NULL ou >= hoje)
     const { data, error } = await supabase
       .from("accounts")
       .select(`
@@ -53,8 +74,8 @@ export default function Index() {
           name
         )
       `)
-      .or(`end_date.is.null,end_date.gte.${today}`)
-      .order("due_date", { ascending: true });
+      .or(`data_fim.is.null,data_fim.gte.${today}`)
+      .order("dia_vencimento", { ascending: true });
 
     if (error) {
       toast.error("Erro ao carregar contas");
@@ -62,7 +83,42 @@ export default function Index() {
       return;
     }
 
-    setAccounts(data || []);
+    // Separar contas em pendentes e entregues
+    const pendingAccounts = (data || []).filter(account => !account.is_delivered);
+    const deliveredAccounts = (data || []).filter(account => account.is_delivered);
+
+    // Identificar pendências de meses anteriores
+    // Uma conta é pendência de mês anterior se:
+    // - Não foi entregue E last_paid_month IS NOT NULL E last_paid_month < mês atual
+    // (Ou seja, foi paga antes mas não foi paga este mês)
+    const previousMonthPendencies = pendingAccounts.filter(account => {
+      return account.last_paid_month && account.last_paid_month < currentMonth;
+    });
+
+    // Pendências do mês atual: todas as outras pendentes (nunca pagas ou resetadas)
+    const currentMonthPendencies = pendingAccounts.filter(account => 
+      !previousMonthPendencies.includes(account)
+    );
+
+    // Ordenar por dia_vencimento
+    const sortByDueDay = (a: any, b: any) => {
+      const dayA = parseInt(a.dia_vencimento) || 31;
+      const dayB = parseInt(b.dia_vencimento) || 31;
+      return dayA - dayB;
+    };
+
+    previousMonthPendencies.sort(sortByDueDay);
+    currentMonthPendencies.sort(sortByDueDay);
+    deliveredAccounts.sort(sortByDueDay);
+
+    // Combinar: pendências anteriores primeiro, depois pendências do mês atual, depois entregues
+    const sortedAccounts = [
+      ...previousMonthPendencies,
+      ...currentMonthPendencies,
+      ...deliveredAccounts
+    ];
+
+    setAccounts(sortedAccounts);
   };
 
   if (loading) {
@@ -86,35 +142,99 @@ export default function Index() {
           <div>
             <h2 className="text-3xl font-bold mb-2">Dashboard</h2>
             <p className="text-muted-foreground">
-              Próximas contas a vencer
+              Faturas do mês de {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
             </p>
           </div>
           
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Nova Conta
+            Nova Fatura Recorrente
           </Button>
         </div>
 
         {accounts.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">
-              Nenhuma conta cadastrada ainda
+              Nenhuma fatura cadastrada ainda
             </p>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Cadastrar Primeira Conta
+              Cadastrar Primeira Fatura
             </Button>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {accounts.map((account) => (
-              <AccountCard 
-                key={account.id} 
-                account={account}
-                onUpdate={loadAccounts}
-              />
-            ))}
+          <div className="space-y-6">
+            {/* Pendências de meses anteriores */}
+            {accounts.filter(acc => {
+              const currentMonth = format(new Date(), "yyyy-MM");
+              return !acc.is_delivered && (acc.last_paid_month === null || acc.last_paid_month < currentMonth);
+            }).length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4 text-destructive">
+                  ⚠️ Pendências de meses anteriores
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {accounts
+                    .filter(acc => {
+                      const currentMonth = format(new Date(), "yyyy-MM");
+                      return !acc.is_delivered && (acc.last_paid_month === null || acc.last_paid_month < currentMonth);
+                    })
+                    .map((account) => (
+                      <AccountCard 
+                        key={account.id} 
+                        account={account}
+                        onUpdate={loadAccounts}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pendências do mês atual */}
+            {accounts.filter(acc => {
+              const currentMonth = format(new Date(), "yyyy-MM");
+              return !acc.is_delivered && acc.last_paid_month === currentMonth;
+            }).length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4">
+                  Pendentes do mês atual
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {accounts
+                    .filter(acc => {
+                      const currentMonth = format(new Date(), "yyyy-MM");
+                      return !acc.is_delivered && acc.last_paid_month === currentMonth;
+                    })
+                    .map((account) => (
+                      <AccountCard 
+                        key={account.id} 
+                        account={account}
+                        onUpdate={loadAccounts}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Faturas entregues */}
+            {accounts.filter(acc => acc.is_delivered).length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
+                  Entregues/Pagas
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {accounts
+                    .filter(acc => acc.is_delivered)
+                    .map((account) => (
+                      <AccountCard 
+                        key={account.id} 
+                        account={account}
+                        onUpdate={loadAccounts}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

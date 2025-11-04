@@ -9,14 +9,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { z } from "zod";
-import { addBusinessDays, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 const accountSchema = z.object({
   supplier_id: z.string().min(1, "Selecione um fornecedor"),
   description: z.string().min(3, "Descrição deve ter pelo menos 3 caracteres").max(200),
   amount: z.number().positive("Valor deve ser maior que zero"),
-  issue_date: z.string().min(1, "Data de emissão é obrigatória"),
-  end_date: z.string().optional(),
+  dia_emissao: z.number().min(1, "Dia de emissão deve ser entre 1 e 31").max(31),
+  dia_vencimento: z.number().min(1, "Dia de vencimento deve ser entre 1 e 31").max(31),
+  data_fim: z.string().optional(),
 });
 
 interface EditAccountDialogProps {
@@ -37,8 +38,9 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
     supplier_id: "",
     description: "",
     amount: "",
-    issue_date: format(new Date(), "yyyy-MM-dd"),
-    end_date: "",
+    dia_emissao: new Date().getDate().toString(),
+    dia_vencimento: (new Date().getDate() + 2).toString(),
+    data_fim: "",
   });
 
   useEffect(() => {
@@ -64,24 +66,20 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
         await new Promise(resolve => setTimeout(resolve, 0));
 
         // Depois de carregar os suppliers, preencher o formData
-        // Tratar datas que podem vir como string ISO ou formato YYYY-MM-DD
-        const issueDate = account.issue_date 
-          ? (account.issue_date.includes('T') 
-              ? format(parseISO(account.issue_date), "yyyy-MM-dd")
-              : account.issue_date.split('T')[0])
-          : format(new Date(), "yyyy-MM-dd");
-        const endDate = account.end_date 
-          ? (account.end_date.includes('T') 
-              ? format(parseISO(account.end_date), "yyyy-MM-dd")
-              : account.end_date.split('T')[0])
+        // Tratar data_fim que pode vir como string ISO ou formato YYYY-MM-DD
+        const dataFim = account.data_fim 
+          ? (account.data_fim.includes('T') 
+              ? format(parseISO(account.data_fim), "yyyy-MM-dd")
+              : account.data_fim.split('T')[0])
           : "";
         
         const newFormData = {
           supplier_id: account.supplier_id || "",
           description: account.description || "",
           amount: account.amount?.toString() || "",
-          issue_date: issueDate,
-          end_date: endDate,
+          dia_emissao: account.dia_emissao?.toString() || new Date().getDate().toString(),
+          dia_vencimento: account.dia_vencimento?.toString() || (new Date().getDate() + 2).toString(),
+          data_fim: dataFim,
         };
         
         setFormData(newFormData);
@@ -93,8 +91,9 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
           supplier_id: "",
           description: "",
           amount: "",
-          issue_date: format(new Date(), "yyyy-MM-dd"),
-          end_date: "",
+          dia_emissao: new Date().getDate().toString(),
+          dia_vencimento: (new Date().getDate() + 2).toString(),
+          data_fim: "",
         });
         setSuppliers([]);
       }
@@ -137,7 +136,9 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
     const result = accountSchema.safeParse({
       ...formData,
       amount: parseFloat(formData.amount),
-      end_date: formData.end_date || undefined,
+      dia_emissao: parseInt(formData.dia_emissao),
+      dia_vencimento: parseInt(formData.dia_vencimento),
+      data_fim: formData.data_fim || undefined,
     });
 
     if (!result.success) {
@@ -147,19 +148,15 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
 
     setLoading(true);
 
-    // Calcular data de vencimento (2 dias úteis)
-    const issueDate = new Date(formData.issue_date);
-    const dueDate = addBusinessDays(issueDate, 2);
-
     const { error } = await supabase
       .from("accounts")
       .update({
         supplier_id: formData.supplier_id,
         description: formData.description,
         amount: parseFloat(formData.amount),
-        issue_date: formData.issue_date,
-        due_date: format(dueDate, "yyyy-MM-dd"),
-        end_date: formData.end_date || null,
+        dia_emissao: parseInt(formData.dia_emissao),
+        dia_vencimento: parseInt(formData.dia_vencimento),
+        data_fim: formData.data_fim || null,
       })
       .eq("id", account.id);
 
@@ -270,25 +267,55 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="issue_date">Data de Emissão</Label>
+              <Label htmlFor="dia_emissao">Dia de Emissão (1-31)</Label>
               <Input
-                id="issue_date"
-                type="date"
-                value={formData.issue_date}
-                onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
+                id="dia_emissao"
+                type="number"
+                min="1"
+                max="31"
+                placeholder="Ex: 5"
+                value={formData.dia_emissao}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || (parseInt(value) >= 1 && parseInt(value) <= 31)) {
+                    setFormData({ ...formData, dia_emissao: value });
+                  }
+                }}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="end_date">Data Fim (Opcional)</Label>
+              <Label htmlFor="dia_vencimento">Dia de Vencimento (1-31)</Label>
               <Input
-                id="end_date"
-                type="date"
-                value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                id="dia_vencimento"
+                type="number"
+                min="1"
+                max="31"
+                placeholder="Ex: 7"
+                value={formData.dia_vencimento}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || (parseInt(value) >= 1 && parseInt(value) <= 31)) {
+                    setFormData({ ...formData, dia_vencimento: value });
+                  }
+                }}
+                required
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="data_fim">Data Fim (Opcional)</Label>
+            <Input
+              id="data_fim"
+              type="date"
+              value={formData.data_fim}
+              onChange={(e) => setFormData({ ...formData, data_fim: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Deixe em branco para conta recorrente indefinida
+            </p>
           </div>
 
           <DialogFooter>
