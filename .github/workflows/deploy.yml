@@ -37,6 +37,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Verify Supabase secrets
+        run: |
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+            echo "❌ Error: VITE_SUPABASE_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VITE_SUPABASE_PROJECT_ID }}" ]; then
+            echo "❌ Error: VITE_SUPABASE_PROJECT_ID secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" ]; then
+            echo "❌ Error: VITE_SUPABASE_PUBLISHABLE_KEY secret is not set"
+            exit 1
+          fi
+          echo "✅ All Supabase secrets are configured"
+      
       - name: Build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
