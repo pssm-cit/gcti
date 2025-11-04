@@ -17,8 +17,11 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
   const [markDeliveredDialogOpen, setMarkDeliveredDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   
-  // Calcular data de vencimento para o mês atual baseado em dia_vencimento
+  // Calcular data de vencimento; usa override (__dueDate) se fornecido
   const getCurrentMonthDueDate = () => {
+    if (account.__dueDate) {
+      return new Date(account.__dueDate);
+    }
     if (!account.dia_vencimento) {
       // Fallback para contas antigas que ainda usam due_date
       return account.due_date ? new Date(account.due_date) : new Date();

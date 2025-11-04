@@ -62,8 +62,16 @@ export default function Index() {
 
   const loadAccounts = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const currentMonth = format(new Date(), "yyyy-MM");
-    
+    const now = new Date();
+    const currentMonthStr = format(now, "yyyy-MM");
+
+    // Helper para calcular vencimento para um mês/ano informados
+    const computeDueDate = (year: number, monthIndex0Based: number, dueDay: number) => {
+      const daysInMonth = new Date(year, monthIndex0Based + 1, 0).getDate();
+      const actualDueDay = Math.min(parseInt(String(dueDay)) || 1, daysInMonth);
+      return new Date(year, monthIndex0Based, actualDueDay);
+    };
+
     // Carregar todas as contas que devem aparecer (data_fim NULL ou >= hoje)
     const { data, error } = await supabase
       .from("accounts")
@@ -83,22 +91,41 @@ export default function Index() {
       return;
     }
 
-    // Separar contas em pendentes e entregues
-    const pendingAccounts = (data || []).filter(account => !account.is_delivered);
-    const deliveredAccounts = (data || []).filter(account => account.is_delivered);
+    // Expandir contas pendentes em cartões "virtuais" para mês anterior e mês atual, quando aplicável
+    const baseAccounts = data || [];
+    const expandedAccounts: any[] = [];
 
-    // Identificar pendências de meses anteriores
-    // Uma conta é pendência de mês anterior se:
-    // - Não foi entregue E last_paid_month IS NOT NULL E last_paid_month < mês atual
-    // (Ou seja, foi paga antes mas não foi paga este mês)
-    const previousMonthPendencies = pendingAccounts.filter(account => {
-      return account.last_paid_month && account.last_paid_month < currentMonth;
-    });
+    for (const account of baseAccounts) {
+      if (!account.is_delivered) {
+        // Card do mês atual
+        const currentDueDate = computeDueDate(now.getFullYear(), now.getMonth(), account.dia_vencimento);
+        expandedAccounts.push({ ...account, __dueDate: currentDueDate.toISOString(), __period: currentMonthStr });
 
-    // Pendências do mês atual: todas as outras pendentes (nunca pagas ou resetadas)
-    const currentMonthPendencies = pendingAccounts.filter(account => 
-      !previousMonthPendencies.includes(account)
-    );
+        // Card do mês anterior, se a recorrência já existia no mês anterior
+        const createdAt = account.created_at ? new Date(account.created_at) : null;
+        const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const hadPreviousCycle = createdAt ? createdAt < startOfCurrentMonth : true;
+        const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevMonthStr = format(prev, "yyyy-MM");
+        if (hadPreviousCycle) {
+          const prevDueDate = computeDueDate(prev.getFullYear(), prev.getMonth(), account.dia_vencimento);
+          expandedAccounts.push({ ...account, __dueDate: prevDueDate.toISOString(), __period: prevMonthStr, __isPreviousMonth: true });
+        }
+      } else {
+        // Entregues permanecem como 1 card (sem duplicar)
+        expandedAccounts.push(account);
+      }
+    }
+
+    // Separar após expansão
+    const pendingAccounts = expandedAccounts.filter(acc => !acc.is_delivered);
+    const deliveredAccounts = expandedAccounts.filter(acc => acc.is_delivered);
+
+    // Identificar pendências de meses anteriores: os virtuais marcados ou período < mês atual
+    const previousMonthPendencies = pendingAccounts.filter(acc => acc.__isPreviousMonth || (acc.__period && acc.__period < currentMonthStr));
+
+    // Pendências do mês atual: período == mês atual
+    const currentMonthPendencies = pendingAccounts.filter(acc => acc.__period === currentMonthStr);
 
     // Ordenar por dia_vencimento
     const sortByDueDay = (a: any, b: any) => {
