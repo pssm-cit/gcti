@@ -30,39 +30,84 @@ export default function History() {
   const loadAccounts = async () => {
     setLoading(true);
 
-    const [year, month] = monthFilter.split("-");
-    const startDate = `${year}-${month}-01`;
-    
-    // Calcular o último dia do mês corretamente
-    // Criar uma data do primeiro dia do próximo mês e subtrair 1 dia
-    const nextMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
-    const nextYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
-    const firstDayNextMonth = new Date(nextYear, nextMonth - 1, 1);
-    const lastDayOfMonth = new Date(firstDayNextMonth.getTime() - 1);
-    const endDate = format(lastDayOfMonth, "yyyy-MM-dd");
+    // Obter user_id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    const { data, error } = await supabase
+    // Buscar histórico de pagamentos filtrando por paid_month
+    const { data: paymentHistory, error: historyError } = await supabase
+      .from("account_payment_history")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("paid_month", monthFilter)
+      .order("paid_date", { ascending: false });
+
+    if (historyError) {
+      toast.error("Erro ao carregar histórico");
+      console.error(historyError);
+      setLoading(false);
+      setAccounts([]);
+      return;
+    }
+
+    if (!paymentHistory || paymentHistory.length === 0) {
+      setLoading(false);
+      setAccounts([]);
+      return;
+    }
+
+    // Buscar as contas relacionadas
+    const accountIds = [...new Set(paymentHistory.map((p: any) => p.account_id))];
+    
+    const { data: accountsData, error: accountsError } = await supabase
       .from("accounts")
       .select(`
-        *,
+        id,
+        description,
+        supplier_id,
         suppliers (
           id,
           name
         )
       `)
-      .gte("issue_date", startDate)
-      .lte("issue_date", endDate)
-      .order("issue_date", { ascending: false });
+      .in("id", accountIds);
 
-    setLoading(false);
-
-    if (error) {
-      toast.error("Erro ao carregar histórico");
-      console.error(error);
+    if (accountsError) {
+      toast.error("Erro ao carregar contas");
+      console.error(accountsError);
+      setLoading(false);
+      setAccounts([]);
       return;
     }
 
-    setAccounts(data || []);
+    // Criar mapa de contas por ID
+    const accountsMap = new Map();
+    (accountsData || []).forEach((acc: any) => {
+      accountsMap.set(acc.id, acc);
+    });
+
+    // Transformar os dados para o formato esperado
+    const transformedData = paymentHistory.map((payment: any) => {
+      const account = accountsMap.get(payment.account_id);
+      return {
+        id: payment.id,
+        account_id: payment.account_id,
+        description: account?.description || "",
+        suppliers: account?.suppliers || null,
+        amount: parseFloat(payment.amount) || 0,
+        paid_month: payment.paid_month,
+        paid_date: payment.paid_date,
+        invoice_numbers: payment.invoice_numbers || [],
+        recipient: payment.recipient || "",
+        is_delivered: true,
+      };
+    });
+
+    setLoading(false);
+    setAccounts(transformedData);
   };
 
   const filterAccounts = () => {
@@ -76,7 +121,8 @@ export default function History() {
       return (
         account.description.toLowerCase().includes(searchLower) ||
         account.suppliers?.name.toLowerCase().includes(searchLower) ||
-        account.invoice_numbers?.some((nf: string) => nf.toLowerCase().includes(searchLower))
+        account.invoice_numbers?.some((nf: string) => nf.toLowerCase().includes(searchLower)) ||
+        account.recipient?.toLowerCase().includes(searchLower)
       );
     });
 
@@ -149,9 +195,9 @@ export default function History() {
                     <TableHead>Fornecedor</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Valor</TableHead>
-                    <TableHead>Emissão</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Competência</TableHead>
+                    <TableHead>Data de Pagamento</TableHead>
+                    <TableHead>Destinatário</TableHead>
                     <TableHead>NF</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -169,19 +215,13 @@ export default function History() {
                         }).format(account.amount)}
                       </TableCell>
                       <TableCell>
-                        {format(parseISO(account.issue_date), "dd/MM/yyyy")}
+                        {account.paid_month ? format(parseISO(account.paid_month + "-01"), "MMMM 'de' yyyy", { locale: ptBR }) : "-"}
                       </TableCell>
                       <TableCell>
-                        {format(parseISO(account.due_date), "dd/MM/yyyy")}
+                        {account.paid_date ? format(parseISO(account.paid_date), "dd/MM/yyyy") : "-"}
                       </TableCell>
                       <TableCell>
-                        {account.is_delivered ? (
-                          <Badge className="bg-success text-success-foreground">
-                            Entregue
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Pendente</Badge>
-                        )}
+                        {account.recipient || "-"}
                       </TableCell>
                       <TableCell>
                         {account.invoice_numbers?.join(", ") || "-"}
