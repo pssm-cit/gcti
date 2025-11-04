@@ -32,7 +32,14 @@ export default function History() {
 
     const [year, month] = monthFilter.split("-");
     const startDate = `${year}-${month}-01`;
-    const endDate = `${year}-${month}-31`;
+    
+    // Calcular o último dia do mês corretamente
+    // Criar uma data do primeiro dia do próximo mês e subtrair 1 dia
+    const nextMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+    const nextYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+    const firstDayNextMonth = new Date(nextYear, nextMonth - 1, 1);
+    const lastDayOfMonth = new Date(firstDayNextMonth.getTime() - 1);
+    const endDate = format(lastDayOfMonth, "yyyy-MM-dd");
 
     const { data, error } = await supabase
       .from("accounts")
