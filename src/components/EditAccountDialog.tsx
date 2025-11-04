@@ -41,44 +41,46 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
   });
 
   useEffect(() => {
-    if (open && account) {
-      loadSuppliers();
-      // Pré-preencher os campos com os dados da conta
-      // Tratar datas que podem vir como string ISO ou formato YYYY-MM-DD
-      const issueDate = account.issue_date 
-        ? (account.issue_date.includes('T') 
-            ? format(parseISO(account.issue_date), "yyyy-MM-dd")
-            : account.issue_date.split('T')[0])
-        : format(new Date(), "yyyy-MM-dd");
-      const endDate = account.end_date 
-        ? (account.end_date.includes('T') 
-            ? format(parseISO(account.end_date), "yyyy-MM-dd")
-            : account.end_date.split('T')[0])
-        : "";
-      
-      setFormData({
-        supplier_id: account.supplier_id || "",
-        description: account.description || "",
-        amount: account.amount?.toString() || "",
-        issue_date: issueDate,
-        end_date: endDate,
-      });
-    }
+    const initializeData = async () => {
+      if (open && account) {
+        // Primeiro carregar os suppliers
+        const { data: suppliersData, error } = await supabase
+          .from("suppliers")
+          .select("*")
+          .order("name");
+
+        if (error) {
+          console.error("Error loading suppliers:", error);
+          return;
+        }
+
+        setSuppliers(suppliersData || []);
+
+        // Depois de carregar os suppliers, preencher o formData
+        // Tratar datas que podem vir como string ISO ou formato YYYY-MM-DD
+        const issueDate = account.issue_date 
+          ? (account.issue_date.includes('T') 
+              ? format(parseISO(account.issue_date), "yyyy-MM-dd")
+              : account.issue_date.split('T')[0])
+          : format(new Date(), "yyyy-MM-dd");
+        const endDate = account.end_date 
+          ? (account.end_date.includes('T') 
+              ? format(parseISO(account.end_date), "yyyy-MM-dd")
+              : account.end_date.split('T')[0])
+          : "";
+        
+        setFormData({
+          supplier_id: account.supplier_id || "",
+          description: account.description || "",
+          amount: account.amount?.toString() || "",
+          issue_date: issueDate,
+          end_date: endDate,
+        });
+      }
+    };
+
+    initializeData();
   }, [open, account]);
-
-  const loadSuppliers = async () => {
-    const { data, error } = await supabase
-      .from("suppliers")
-      .select("*")
-      .order("name");
-
-    if (error) {
-      console.error("Error loading suppliers:", error);
-      return;
-    }
-
-    setSuppliers(data || []);
-  };
 
   const handleAddSupplier = async () => {
     if (!newSupplierName.trim()) {
