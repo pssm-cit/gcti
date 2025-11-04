@@ -31,6 +31,7 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const [formData, setFormData] = useState({
     supplier_id: "",
@@ -43,6 +44,7 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
   useEffect(() => {
     const initializeData = async () => {
       if (open && account) {
+        setIsInitialized(false);
         console.log("🔵 [EditDialog] Iniciando carregamento, account.supplier_id:", account.supplier_id);
         
         // Primeiro carregar os suppliers
@@ -58,7 +60,12 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
 
         console.log("🟢 [EditDialog] Suppliers carregados:", suppliersData?.length, "suppliers");
         console.log("🟢 [EditDialog] Suppliers IDs:", suppliersData?.map(s => s.id));
+        
+        // Primeiro definir os suppliers
         setSuppliers(suppliersData || []);
+
+        // Aguardar um tick para garantir que o estado foi atualizado
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         // Depois de carregar os suppliers, preencher o formData
         // Tratar datas que podem vir como string ISO ou formato YYYY-MM-DD
@@ -84,6 +91,18 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
         console.log("🟡 [EditDialog] Definindo formData:", newFormData);
         console.log("🟡 [EditDialog] supplier_id existe nos suppliers?", suppliersData?.some(s => s.id === account.supplier_id));
         setFormData(newFormData);
+        setIsInitialized(true);
+      } else {
+        setIsInitialized(false);
+        // Reset form data quando fechar
+        setFormData({
+          supplier_id: "",
+          description: "",
+          amount: "",
+          issue_date: format(new Date(), "yyyy-MM-dd"),
+          end_date: "",
+        });
+        setSuppliers([]);
       }
     };
 
@@ -198,15 +217,19 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
                   });
                   return null;
                 })()}
-                <Select
-                  value={formData.supplier_id}
+                                 <Select
+                  key={`select-${suppliers.length}-${formData.supplier_id}`}
+                  value={formData.supplier_id || undefined}
                   onValueChange={(value) => {
                     console.log("🔄 [EditDialog] Select mudou para:", value);
-                    setFormData({ ...formData, supplier_id: value });
+                    if (value && value !== formData.supplier_id) {
+                      setFormData({ ...formData, supplier_id: value });
+                    }
                   }}
+                  disabled={!isInitialized || suppliers.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um fornecedor" />
+                    <SelectValue placeholder={isInitialized ? "Selecione um fornecedor" : "Carregando..."} />
                   </SelectTrigger>
                   <SelectContent>
                     {suppliers.map((supplier) => (
