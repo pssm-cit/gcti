@@ -5,7 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: "/gcti/",
+  // Use GitHub Pages base only when explicitly enabled in env
+  base: mode === "production" && process.env.GITHUB_PAGES === "true" ? "/gcti/" : "/",
   server: {
     host: "::",
     port: 8080,

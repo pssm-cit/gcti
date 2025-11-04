@@ -327,22 +327,13 @@ CREATE TRIGGER update_profiles_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-### 3. String de Conexão PostgreSQL
+### 3. Conexão com o Banco de Dados (Segurança)
 
-Para acesso direto ao banco de dados PostgreSQL, use a seguinte string de conexão:
+Para o frontend, utilize sempre o SDK do Supabase com as variáveis de ambiente públicas (`VITE_SUPABASE_*`).
 
-```
-postgresql://postgres:d6rF76N4vBEcOGum7z1@db.wlipynhbebhthznkkuli.supabase.co:5432/postgres
-```
+Se precisar de acesso direto ao PostgreSQL (admin/ETL), gere uma string de conexão apenas no painel do Supabase e mantenha-a fora do repositório (use secrets de CI/CD ou variáveis de ambiente do servidor). Nunca commit credenciais.
 
-**⚠️ Importante:** Mantenha essa string segura e não a compartilhe publicamente. Ela contém credenciais sensíveis do banco de dados.
-
-**Informações da conexão:**
-- **Host:** `db.wlipynhbebhthznkkuli.supabase.co`
-- **Porta:** `5432`
-- **Database:** `postgres`
-- **User:** `postgres`
-- **Password:** `d6rF76N4vBEcOGum7z1`
+**⚠️ Importante:** Credenciais de banco não devem ser versionadas. Rotacione imediatamente qualquer credencial que tenha sido exposta e prefira o acesso via Supabase (RLS + Auth) no frontend.
 
 ## 📁 Estrutura do Projeto
 

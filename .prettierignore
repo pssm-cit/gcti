@@ -1,0 +1,18 @@
+node_modules
+.dist
+.dist-ssr
+dist
+dist-ssr
+bun.lockb
+**/*.svg
+**/*.png
+**/*.jpg
+**/*.ico
+
+# Env files
+.env*
+.env
+.env.local
+.env.production
+.env.development
+
