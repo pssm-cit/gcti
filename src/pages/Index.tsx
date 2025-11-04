@@ -9,7 +9,7 @@ import { AccountCard } from "@/components/AccountCard";
 import type { Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale"; 
+import { ptBR } from "date-fns/locale";
 
 export default function Index() {
   const navigate = useNavigate();
