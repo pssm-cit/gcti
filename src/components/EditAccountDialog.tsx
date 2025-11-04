@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
@@ -31,7 +32,16 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
-  const [newSupplierName, setNewSupplierName] = useState("");
+  const [supplierFormData, setSupplierFormData] = useState({
+    name: "",
+    cpf_cnpj: "",
+    invoice_sent_by_email: false,
+    invoice_sent_by_portal: false,
+    portal_url: "",
+    portal_login: "",
+    portal_password: "",
+    observations: "",
+  });
   const [isInitialized, setIsInitialized] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -103,7 +113,7 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
   }, [open, account]);
 
   const handleAddSupplier = async () => {
-    if (!newSupplierName.trim()) {
+    if (!supplierFormData.name.trim()) {
       toast.error("Digite um nome para o fornecedor");
       return;
     }
@@ -111,9 +121,21 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    const supplierData: any = {
+      name: supplierFormData.name,
+      user_id: user.id,
+      cpf_cnpj: supplierFormData.cpf_cnpj || null,
+      invoice_sent_by_email: supplierFormData.invoice_sent_by_email,
+      invoice_sent_by_portal: supplierFormData.invoice_sent_by_portal,
+      portal_url: supplierFormData.invoice_sent_by_portal ? supplierFormData.portal_url || null : null,
+      portal_login: supplierFormData.invoice_sent_by_portal ? supplierFormData.portal_login || null : null,
+      portal_password: supplierFormData.invoice_sent_by_portal ? supplierFormData.portal_password || null : null,
+      observations: supplierFormData.observations || null,
+    };
+
     const { data, error } = await supabase
       .from("suppliers")
-      .insert([{ name: newSupplierName, user_id: user.id }])
+      .insert([supplierData])
       .select()
       .single();
 
@@ -126,7 +148,16 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
     toast.success("Fornecedor adicionado!");
     setSuppliers([...suppliers, data]);
     setFormData({ ...formData, supplier_id: data.id });
-    setNewSupplierName("");
+    setSupplierFormData({
+      name: "",
+      cpf_cnpj: "",
+      invoice_sent_by_email: false,
+      invoice_sent_by_portal: false,
+      portal_url: "",
+      portal_login: "",
+      portal_password: "",
+      observations: "",
+    });
     setShowNewSupplier(false);
   };
 
@@ -221,22 +252,127 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
                 </Button>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Nome do fornecedor"
-                  value={newSupplierName}
-                  onChange={(e) => setNewSupplierName(e.target.value)}
-                />
-                <Button type="button" onClick={handleAddSupplier}>
-                  Adicionar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowNewSupplier(false)}
-                >
-                  Cancelar
-                </Button>
+              <div className="space-y-4 border rounded-lg p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier_name">Nome *</Label>
+                  <Input
+                    id="supplier_name"
+                    placeholder="Nome do fornecedor"
+                    value={supplierFormData.name}
+                    onChange={(e) => setSupplierFormData({ ...supplierFormData, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cpf_cnpj">CPF/CNPJ</Label>
+                  <Input
+                    id="cpf_cnpj"
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                    value={supplierFormData.cpf_cnpj}
+                    onChange={(e) => setSupplierFormData({ ...supplierFormData, cpf_cnpj: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Fatura enviada por:</Label>
+                  <div className="flex items-center space-x-6">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="invoice_email"
+                        checked={supplierFormData.invoice_sent_by_email}
+                        onCheckedChange={(checked) =>
+                          setSupplierFormData({ ...supplierFormData, invoice_sent_by_email: checked === true })
+                        }
+                      />
+                      <Label htmlFor="invoice_email" className="font-normal cursor-pointer">
+                        E-mail
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="invoice_portal"
+                        checked={supplierFormData.invoice_sent_by_portal}
+                        onCheckedChange={(checked) =>
+                          setSupplierFormData({ ...supplierFormData, invoice_sent_by_portal: checked === true })
+                        }
+                      />
+                      <Label htmlFor="invoice_portal" className="font-normal cursor-pointer">
+                        Portal
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {supplierFormData.invoice_sent_by_portal && (
+                  <div className="space-y-3 border-t pt-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="portal_url">URL do Portal</Label>
+                      <Input
+                        id="portal_url"
+                        type="url"
+                        placeholder="https://portal.exemplo.com.br"
+                        value={supplierFormData.portal_url}
+                        onChange={(e) => setSupplierFormData({ ...supplierFormData, portal_url: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="portal_login">Login</Label>
+                      <Input
+                        id="portal_login"
+                        placeholder="Login do portal"
+                        value={supplierFormData.portal_login}
+                        onChange={(e) => setSupplierFormData({ ...supplierFormData, portal_login: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="portal_password">Senha</Label>
+                      <Input
+                        id="portal_password"
+                        type="password"
+                        placeholder="Senha do portal"
+                        value={supplierFormData.portal_password}
+                        onChange={(e) => setSupplierFormData({ ...supplierFormData, portal_password: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="supplier_observations">Observações</Label>
+                  <Textarea
+                    id="supplier_observations"
+                    placeholder="Observações sobre o fornecedor"
+                    value={supplierFormData.observations}
+                    onChange={(e) => setSupplierFormData({ ...supplierFormData, observations: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button type="button" onClick={handleAddSupplier}>
+                    Adicionar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowNewSupplier(false);
+                      setSupplierFormData({
+                        name: "",
+                        cpf_cnpj: "",
+                        invoice_sent_by_email: false,
+                        invoice_sent_by_portal: false,
+                        portal_url: "",
+                        portal_login: "",
+                        portal_password: "",
+                        observations: "",
+                      });
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
               </div>
             )}
           </div>
