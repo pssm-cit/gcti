@@ -4,9 +4,18 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
 
     permissions:
@@ -27,6 +36,16 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify Supabase secrets
+        run: |
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+            echo "❌ Error: VITE_SUPABASE_URL secret is not set"; exit 1; fi
+          if [ -z "${{ secrets.VITE_SUPABASE_PROJECT_ID }}" ]; then
+            echo "❌ Error: VITE_SUPABASE_PROJECT_ID secret is not set"; exit 1; fi
+          if [ -z "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" ]; then
+            echo "❌ Error: VITE_SUPABASE_PUBLISHABLE_KEY secret is not set"; exit 1; fi
+          echo "✅ All Supabase secrets are configured"
+
       - name: Build
         env:
           GITHUB_PAGES: "true"
@@ -43,79 +62,6 @@ jobs:
         with:
           path: './dist'
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches:
-      - main  # Altere para 'master' se sua branch principal for essa
-  workflow_dispatch:
-
-# Permite apenas uma execução por vez
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    
-    runs-on: ubuntu-latest
-    
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Verify Supabase secrets
-        run: |
-          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
-            echo "❌ Error: VITE_SUPABASE_URL secret is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.VITE_SUPABASE_PROJECT_ID }}" ]; then
-            echo "❌ Error: VITE_SUPABASE_PROJECT_ID secret is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" ]; then
-            echo "❌ Error: VITE_SUPABASE_PUBLISHABLE_KEY secret is not set"
-            exit 1
-          fi
-          echo "✅ All Supabase secrets are configured"
-      
-      - name: Build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-        run: npm run build
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './dist'
-      
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
