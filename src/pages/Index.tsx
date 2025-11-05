@@ -16,6 +16,9 @@ export default function Index() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [previousMonthPendencies, setPreviousMonthPendencies] = useState<any[]>([]);
+  const [currentMonthPendencies, setCurrentMonthPendencies] = useState<any[]>([]);
+  const [deliveredAccounts, setDeliveredAccounts] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -140,6 +143,9 @@ export default function Index() {
     const expandedAccounts: any[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    // Set para evitar duplicatas durante a criação: account_id + paidMonthKey
+    const createdKeys = new Set<string>();
 
     for (const account of baseAccounts) {
       const createdAt = account.created_at ? new Date(account.created_at) : new Date();
@@ -185,6 +191,15 @@ export default function Index() {
         
         // Verificar se este mês já foi pago
         const paidMonthKey = format(issueDate, "yyyy-MM");
+        const uniqueKey = `${account.id}-${paidMonthKey}`;
+        
+        // Verificar se já criamos este card (evitar duplicatas)
+        if (createdKeys.has(uniqueKey)) {
+          monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1);
+          continue;
+        }
+        createdKeys.add(uniqueKey);
+        
         if (!paidMonths.has(paidMonthKey)) {
           const isPreviousMonth = issueDateOnly < today && format(issueDate, "yyyy-MM") < currentMonthStr;
           
@@ -224,8 +239,19 @@ export default function Index() {
     const pendingAccounts = expandedAccounts.filter(acc => !acc.__isPaid);
     const deliveredAccounts = expandedAccounts.filter(acc => acc.__isPaid);
 
+    // Criar um Set para evitar duplicatas baseado em account.id + __period
+    const seenKeys = new Set<string>();
+    const uniquePendingAccounts = pendingAccounts.filter(acc => {
+      const key = `${acc.id}-${acc.__period}`;
+      if (seenKeys.has(key)) {
+        return false;
+      }
+      seenKeys.add(key);
+      return true;
+    });
+
     // Identificar pendências de meses anteriores: data de emissão passada e não paga
-    const previousMonthPendencies = pendingAccounts.filter(acc => {
+    const previousMonthPendencies = uniquePendingAccounts.filter(acc => {
       if (!acc.__issueDate) return false;
       const issueDate = new Date(acc.__issueDate);
       issueDate.setHours(0, 0, 0, 0);
@@ -235,13 +261,16 @@ export default function Index() {
     });
 
     // Pendências do mês atual: data de emissão é hoje ou no futuro próximo
-    const currentMonthPendencies = pendingAccounts.filter(acc => {
+    // Excluir as que já estão em previousMonthPendencies
+    const currentMonthPendencies = uniquePendingAccounts.filter(acc => {
       if (!acc.__issueDate) return false;
       const issueDate = new Date(acc.__issueDate);
       issueDate.setHours(0, 0, 0, 0);
       const todayDate = new Date();
       todayDate.setHours(0, 0, 0, 0);
-      return issueDate >= todayDate || format(issueDate, "yyyy-MM") === currentMonthStr;
+      // Não incluir se já está em previousMonthPendencies
+      const isPrevious = issueDate < todayDate;
+      return !isPrevious;
     });
 
     // Ordenar por data de emissão
@@ -262,6 +291,11 @@ export default function Index() {
       return sortByIssueDate(a, b);
     });
 
+    // Armazenar separadamente para uso no render
+    setPreviousMonthPendencies(previousMonthPendencies);
+    setCurrentMonthPendencies(currentMonthPendencies);
+    setDeliveredAccounts(deliveredAccounts);
+    
     // Combinar: pendências anteriores primeiro, depois pendências do mês atual, depois entregues
     const sortedAccounts = [
       ...previousMonthPendencies,
@@ -316,89 +350,55 @@ export default function Index() {
         ) : (
           <div className="space-y-6">
             {/* Pendências de meses anteriores */}
-            {accounts.filter(acc => {
-              if (!acc.__issueDate) return false;
-              const issueDate = new Date(acc.__issueDate);
-              issueDate.setHours(0, 0, 0, 0);
-              const todayDate = new Date();
-              todayDate.setHours(0, 0, 0, 0);
-              return !acc.__isPaid && issueDate < todayDate;
-            }).length > 0 && (
+            {previousMonthPendencies.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-destructive">
                   ⚠️ Pendências de meses anteriores
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {accounts
-                    .filter(acc => {
-                      if (!acc.__issueDate) return false;
-                      const issueDate = new Date(acc.__issueDate);
-                      issueDate.setHours(0, 0, 0, 0);
-                      const todayDate = new Date();
-                      todayDate.setHours(0, 0, 0, 0);
-                      return !acc.__isPaid && issueDate < todayDate;
-                    })
-                    .map((account, index) => (
-                      <AccountCard 
-                        key={`${account.id}-${account.__period}-${index}`} 
-                        account={account}
-                        onUpdate={loadAccounts}
-                      />
-                    ))}
+                  {previousMonthPendencies.map((account, index) => (
+                    <AccountCard 
+                      key={`${account.id}-${account.__period}-${index}`} 
+                      account={account}
+                      onUpdate={loadAccounts}
+                    />
+                  ))}
                 </div>
               </div>
             )}
 
             {/* Pendências do mês atual */}
-            {accounts.filter(acc => {
-              if (!acc.__issueDate) return false;
-              const issueDate = new Date(acc.__issueDate);
-              issueDate.setHours(0, 0, 0, 0);
-              const todayDate = new Date();
-              todayDate.setHours(0, 0, 0, 0);
-              return !acc.__isPaid && (issueDate >= todayDate || format(issueDate, "yyyy-MM") === format(todayDate, "yyyy-MM"));
-            }).length > 0 && (
+            {currentMonthPendencies.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">
                   Pendentes
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {accounts
-                    .filter(acc => {
-                      if (!acc.__issueDate) return false;
-                      const issueDate = new Date(acc.__issueDate);
-                      issueDate.setHours(0, 0, 0, 0);
-                      const todayDate = new Date();
-                      todayDate.setHours(0, 0, 0, 0);
-                      return !acc.__isPaid && (issueDate >= todayDate || format(issueDate, "yyyy-MM") === format(todayDate, "yyyy-MM"));
-                    })
-                    .map((account, index) => (
-                      <AccountCard 
-                        key={`${account.id}-${account.__period}-${index}`} 
-                        account={account}
-                        onUpdate={loadAccounts}
-                      />
-                    ))}
+                  {currentMonthPendencies.map((account, index) => (
+                    <AccountCard 
+                      key={`${account.id}-${account.__period}-${index}`} 
+                      account={account}
+                      onUpdate={loadAccounts}
+                    />
+                  ))}
                 </div>
               </div>
             )}
 
             {/* Faturas entregues */}
-            {accounts.filter(acc => acc.__isPaid).length > 0 && (
+            {deliveredAccounts.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
                   Entregues
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {accounts
-                    .filter(acc => acc.__isPaid)
-                    .map((account, index) => (
-                      <AccountCard 
-                        key={`${account.id}-${account.__period}-${index}`} 
-                        account={account}
-                        onUpdate={loadAccounts}
-                      />
-                    ))}
+                  {deliveredAccounts.map((account, index) => (
+                    <AccountCard 
+                      key={`${account.id}-${account.__period}-${index}`} 
+                      account={account}
+                      onUpdate={loadAccounts}
+                    />
+                  ))}
                 </div>
               </div>
             )}
