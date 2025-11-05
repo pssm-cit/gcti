@@ -250,7 +250,7 @@ export default function Index() {
       return true;
     });
 
-    // Identificar pendências de meses anteriores: data de emissão passada e não paga
+    // Identificar pendências de entrega: data de emissão passada e não paga
     const previousMonthPendencies = uniquePendingAccounts.filter(acc => {
       if (!acc.__issueDate) return false;
       const issueDate = new Date(acc.__issueDate);
@@ -349,11 +349,11 @@ export default function Index() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Pendências de meses anteriores */}
+            {/* Pendências de entrega */}
             {previousMonthPendencies.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-destructive">
-                  ⚠️ Pendências de meses anteriores
+                  ⚠️ Pendências de entrega
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {previousMonthPendencies.map((account, index) => (
@@ -371,7 +371,7 @@ export default function Index() {
             {currentMonthPendencies.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">
-                  Pendentes
+                  Futuros a receber
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {currentMonthPendencies.map((account, index) => (

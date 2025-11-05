@@ -86,12 +86,12 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
       return <Badge className="bg-success text-success-foreground">Entregue</Badge>;
     }
     if (isOverdue) {
-      return <Badge className="bg-destructive text-destructive-foreground">Vencida</Badge>;
+      return <Badge className="bg-destructive text-destructive-foreground">Entrega atrasada</Badge>;
     }
     if (isDueToday) {
-      return <Badge className="bg-warning text-warning-foreground">Vence Hoje</Badge>;
+      return <Badge className="bg-warning text-warning-foreground">Pendente de entrega</Badge>;
     }
-    return <Badge variant="secondary">Pendente</Badge>;
+    return <Badge variant="secondary">Futuro a receber</Badge>;
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
