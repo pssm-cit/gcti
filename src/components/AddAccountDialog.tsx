@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
+import { Plus, X } from "lucide-react";
 
 const accountSchema = z.object({
   supplier_id: z.string().min(1, "Selecione um fornecedor"),
@@ -28,6 +29,9 @@ interface AddAccountDialogProps {
 export function AddAccountDialog({ open, onOpenChange, onSuccess }: AddAccountDialogProps) {
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [costCenters, setCostCenters] = useState<{ code: string; percent: number }[]>([
+    { code: "", percent: 100 },
+  ]);
 
   const [formData, setFormData] = useState({
     supplier_id: "",
@@ -79,6 +83,34 @@ export function AddAccountDialog({ open, onOpenChange, onSuccess }: AddAccountDi
       return;
     }
 
+    // Validar centros de custo
+    const codeRegex = /^\d{2}\.\d{3}$/;
+    const cleaned = costCenters
+      .map((c) => ({ code: c.code.trim(), percent: Number(c.percent) }))
+      .filter((c) => c.code !== "");
+
+    if (cleaned.length === 0) {
+      toast.error("Adicione pelo menos 1 centro de custo");
+      return;
+    }
+
+    for (const c of cleaned) {
+      if (!codeRegex.test(c.code)) {
+        toast.error("Código de centro de custo inválido. Use o formato 01.001");
+        return;
+      }
+      if (isNaN(c.percent) || c.percent <= 0) {
+        toast.error("Percentual deve ser maior que 0");
+        return;
+      }
+    }
+
+    const total = cleaned.reduce((sum, c) => sum + c.percent, 0);
+    if (Math.round(total) !== 100) {
+      toast.error("A soma dos percentuais deve ser 100%");
+      return;
+    }
+
     setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -92,6 +124,7 @@ export function AddAccountDialog({ open, onOpenChange, onSuccess }: AddAccountDi
       dia_emissao: parseInt(formData.dia_emissao),
       dia_vencimento: parseInt(formData.dia_vencimento),
       data_fim: formData.data_fim || null,
+      cost_centers: cleaned,
     }]);
 
     setLoading(false);
@@ -113,6 +146,7 @@ export function AddAccountDialog({ open, onOpenChange, onSuccess }: AddAccountDi
       dia_vencimento: (new Date().getDate() + 2).toString(),
       data_fim: "",
     });
+    setCostCenters([{ code: "", percent: 100 }]);
   };
 
   return (
@@ -220,6 +254,94 @@ export function AddAccountDialog({ open, onOpenChange, onSuccess }: AddAccountDi
             <p className="text-xs text-muted-foreground">
               Deixe em branco para conta recorrente indefinida
             </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Centros de Custo</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const next = [...costCenters, { code: "", percent: 0 }];
+                  // distribuir igualmente
+                  const n = next.length;
+                  const base = Math.floor(100 / n);
+                  const remainder = 100 - base * n;
+                  const distributed = next.map((c, i) => ({
+                    code: c.code,
+                    percent: base + (i < remainder ? 1 : 0),
+                  }));
+                  setCostCenters(distributed);
+                }}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {costCenters.map((cc, index) => (
+              <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                <div className="col-span-7">
+                  <Input
+                    placeholder="01.001"
+                    value={cc.code}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      const next = [...costCenters];
+                      next[index] = { ...next[index], code: value };
+                      setCostCenters(next);
+                    }}
+                  />
+                </div>
+                <div className="col-span-4">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={cc.percent}
+                    onChange={(e) => {
+                      const num = Number(e.target.value);
+                      const next = [...costCenters];
+                      next[index] = { ...next[index], percent: isNaN(num) ? 0 : num };
+                      setCostCenters(next);
+                    }}
+                  />
+                </div>
+                <div className="col-span-1 flex justify-end">
+                  {costCenters.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        const next = costCenters.filter((_, i) => i !== index);
+                        if (next.length === 0) {
+                          setCostCenters([{ code: "", percent: 100 }]);
+                          return;
+                        }
+                        const n = next.length;
+                        const base = Math.floor(100 / n);
+                        const remainder = 100 - base * n;
+                        const distributed = next.map((c, i) => ({
+                          code: c.code,
+                          percent: base + (i < remainder ? 1 : 0),
+                        }));
+                        setCostCenters(distributed);
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            <div className="text-xs text-muted-foreground">
+              Total: {costCenters.reduce((s, c) => s + Number(c.percent || 0), 0)}%
+            </div>
+            <p className="text-xs text-muted-foreground">Formato do código: 01.001. Ajuste os percentuais conforme necessário (total 100%).</p>
           </div>
 
           <DialogFooter>

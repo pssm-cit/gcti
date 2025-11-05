@@ -80,6 +80,14 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
 
     // Não atualizar a conta original - apenas salvar no histórico
     // Salvar no histórico de pagamentos
+    const centers: { code: string; percent: number; value: number }[] = Array.isArray(account.cost_centers)
+      ? account.cost_centers.map((c: any) => ({
+          code: String(c.code ?? ""),
+          percent: Number(c.percent ?? 0),
+          value: Math.round((Number(account.amount) * Number(c.percent ?? 0)) ) / 100,
+        }))
+      : [];
+
     const { error: historyError } = await supabase
       .from("account_payment_history")
       .insert({
@@ -90,6 +98,7 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
         invoice_numbers: validInvoices,
         recipient: recipient,
         amount: account.amount,
+        cost_centers_snapshot: centers,
       });
 
     if (historyError) {
