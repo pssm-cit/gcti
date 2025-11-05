@@ -327,6 +327,39 @@ CREATE TRIGGER update_profiles_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
+**⚠️ IMPORTANTE: Após executar o script acima, você precisa executar a migração adicional para permitir que administradores vejam usuários pendentes:**
+
+Acesse o **SQL Editor** no dashboard do Supabase e execute também o seguinte script:
+
+```sql
+-- Migração: Adicionar políticas para administradores verem todos os perfis
+-- Permite que usuários administradores vejam e atualizem todos os perfis (incluindo pendentes)
+
+-- Política para administradores verem todos os perfis (incluindo pendentes)
+CREATE POLICY "Admins can view all profiles"
+  ON public.profiles FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND admin = true
+    )
+  );
+
+-- Política para administradores atualizarem todos os perfis
+CREATE POLICY "Admins can update all profiles"
+  ON public.profiles FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND admin = true
+    )
+  );
+```
+
+**Por que isso é necessário?**
+
+As políticas RLS padrão permitem que usuários vejam apenas seu próprio perfil. Para que administradores possam ver e aprovar usuários pendentes na tela de ADMIN, é necessário adicionar essas políticas adicionais que verificam se o usuário logado é um administrador (`admin = true`).
+
 ### 3. Conexão com o Banco de Dados (Segurança)
 
 Para o frontend, utilize sempre o SDK do Supabase com as variáveis de ambiente públicas (`VITE_SUPABASE_*`).

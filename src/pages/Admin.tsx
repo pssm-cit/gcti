@@ -14,12 +14,37 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
 
   const loadData = async () => {
-    // Carregar pendentes
-    const { data: pend } = await supabase.from("profiles").select("id, full_name, status, tenant_id").eq("status", "pending");
-    setPendingUsers(pend || []);
-    // Carregar tenants
-    const { data: t } = await supabase.from("tenants").select("id, name").order("name");
-    setTenants(t || []);
+    try {
+      // Carregar pendentes
+      const { data: pend, error: pendError } = await supabase
+        .from("profiles")
+        .select("id, full_name, status, tenant_id")
+        .eq("status", "pending");
+      
+      if (pendError) {
+        console.error("Erro ao carregar usuários pendentes:", pendError);
+        toast.error("Erro ao carregar usuários pendentes: " + pendError.message);
+      } else {
+        console.log("Usuários pendentes carregados:", pend);
+        setPendingUsers(pend || []);
+      }
+      
+      // Carregar tenants
+      const { data: t, error: tenantsError } = await supabase
+        .from("tenants")
+        .select("id, name")
+        .order("name");
+      
+      if (tenantsError) {
+        console.error("Erro ao carregar tenants:", tenantsError);
+        toast.error("Erro ao carregar tenants: " + tenantsError.message);
+      } else {
+        setTenants(t || []);
+      }
+    } catch (error: any) {
+      console.error("Erro inesperado ao carregar dados:", error);
+      toast.error("Erro ao carregar dados: " + error.message);
+    }
   };
 
   useEffect(() => {
