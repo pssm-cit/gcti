@@ -117,7 +117,13 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
     setMarkDeliveredDialogOpen(true);
   };
 
-  const canShowLock = account?.suppliers?.portal === true;
+  const canShowLock = (() => {
+    const s = account?.suppliers || {};
+    const portalFlag = s.portal;
+    const truthyPortal = portalFlag === true || portalFlag === 1 || portalFlag === '1' || portalFlag === 'true' || portalFlag === 't' || portalFlag === 'T';
+    const hasAnyCred = Boolean(s.portal_url || s.portal_login || s.portal_password);
+    return Boolean(truthyPortal || hasAnyCred);
+  })();
 
   const handleLockClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
