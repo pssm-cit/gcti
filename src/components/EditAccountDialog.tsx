@@ -204,7 +204,7 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Conta</DialogTitle>
           <DialogDescription>
