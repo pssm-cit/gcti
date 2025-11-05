@@ -335,30 +335,42 @@ Acesse o **SQL Editor** no dashboard do Supabase e execute também o seguinte sc
 -- Migração: Adicionar políticas para administradores verem todos os perfis
 -- Permite que usuários administradores vejam e atualizem todos os perfis (incluindo pendentes)
 
+-- Função helper para verificar se usuário é admin sem dependência circular
+-- Esta função usa SECURITY DEFINER para bypassar RLS
+CREATE OR REPLACE FUNCTION public.is_admin(user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = user_id AND admin = true
+  );
+END;
+$$;
+
+-- Remover políticas antigas se existirem (caso já tenha executado versão anterior)
+DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can update all profiles" ON public.profiles;
+
 -- Política para administradores verem todos os perfis (incluindo pendentes)
+-- Usa a função helper para evitar dependência circular
 CREATE POLICY "Admins can view all profiles"
   ON public.profiles FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND admin = true
-    )
-  );
+  USING (public.is_admin(auth.uid()));
 
 -- Política para administradores atualizarem todos os perfis
 CREATE POLICY "Admins can update all profiles"
   ON public.profiles FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND admin = true
-    )
-  );
+  USING (public.is_admin(auth.uid()));
 ```
 
 **Por que isso é necessário?**
 
 As políticas RLS padrão permitem que usuários vejam apenas seu próprio perfil. Para que administradores possam ver e aprovar usuários pendentes na tela de ADMIN, é necessário adicionar essas políticas adicionais que verificam se o usuário logado é um administrador (`admin = true`).
+
+**⚠️ IMPORTANTE:** Se você já executou uma versão anterior deste script e está tendo problemas (como o menu Admin desaparecendo), execute o script novamente. Ele vai remover as políticas antigas e criar novas com a função helper que evita dependência circular.
 
 ### 3. Conexão com o Banco de Dados (Segurança)
 

@@ -13,10 +13,35 @@ export function Navbar() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from("profiles").select("admin").eq("id", user.id).single();
-      if (data && (data as any).admin === true) setIsAdmin(true);
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error("Erro ao obter usuário:", userError);
+          return;
+        }
+        if (!user) return;
+        
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("admin")
+          .eq("id", user.id)
+          .single();
+        
+        if (error) {
+          console.error("Erro ao verificar admin:", error);
+          return;
+        }
+        
+        console.log("Dados do perfil:", data);
+        if (data && (data as any).admin === true) {
+          console.log("Usuário é admin, mostrando menu Admin");
+          setIsAdmin(true);
+        } else {
+          console.log("Usuário não é admin, admin =", (data as any)?.admin);
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao verificar admin:", err);
+      }
     })();
   }, []);
 
