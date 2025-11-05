@@ -1,7 +1,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Calendar, DollarSign, Building2 } from "lucide-react";
+import { CheckCircle2, Calendar, DollarSign, Building2, FileText } from "lucide-react";
 import { useState } from "react";
 import { MarkDeliveredDialog } from "./MarkDeliveredDialog";
 import { EditAccountDialog } from "./EditAccountDialog";
@@ -39,8 +39,31 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
     
     return new Date(currentYear, currentMonth, actualDueDay);
   };
+
+  // Calcular data de emissão; usa override (__issueDate) se fornecido
+  const getCurrentMonthIssueDate = () => {
+    if (account.__issueDate) {
+      return new Date(account.__issueDate);
+    }
+    if (!account.dia_emissao) {
+      // Fallback para contas antigas
+      return account.issue_date ? new Date(account.issue_date) : new Date();
+    }
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const issueDay = parseInt(account.dia_emissao) || 1;
+    
+    // Criar data de emissão no mês atual
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const actualIssueDay = Math.min(issueDay, daysInMonth);
+    
+    return new Date(currentYear, currentMonth, actualIssueDay);
+  };
   
   const dueDate = getCurrentMonthDueDate();
+  const issueDate = getCurrentMonthIssueDate();
   const isPaid = account.__isPaid === true;
   const isOverdue = isPast(dueDate) && !isToday(dueDate) && !isPaid;
   const isDueToday = isToday(dueDate) && !isPaid;
@@ -105,6 +128,13 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
                 style: 'currency',
                 currency: 'BRL'
               }).format(account.amount)}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <FileText className="w-4 h-4" />
+            <span>
+              Emissão: {format(issueDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </span>
           </div>
           

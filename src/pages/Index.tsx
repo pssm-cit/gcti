@@ -72,6 +72,13 @@ export default function Index() {
       return new Date(year, monthIndex0Based, actualDueDay);
     };
 
+    // Helper para calcular data de emissão para um mês/ano informados
+    const computeIssueDate = (year: number, monthIndex0Based: number, issueDay: number) => {
+      const daysInMonth = new Date(year, monthIndex0Based + 1, 0).getDate();
+      const actualIssueDay = Math.min(parseInt(String(issueDay)) || 1, daysInMonth);
+      return new Date(year, monthIndex0Based, actualIssueDay);
+    };
+
     // Carregar todas as contas que devem aparecer (data_fim NULL ou >= hoje)
     const { data: accountsData, error: accountsError } = await supabase
       .from("accounts")
@@ -142,11 +149,18 @@ export default function Index() {
             account.dia_vencimento
           );
           
+          const issueDate = computeIssueDate(
+            monthCursor.getFullYear(),
+            monthCursor.getMonth(),
+            account.dia_emissao
+          );
+          
           const isPreviousMonth = monthStr < currentMonthStr;
           
           expandedAccounts.push({
             ...account,
             __dueDate: dueDate.toISOString(),
+            __issueDate: issueDate.toISOString(),
             __period: monthStr,
             __isPreviousMonth: isPreviousMonth,
             __isPaid: false
@@ -159,6 +173,12 @@ export default function Index() {
             account.dia_vencimento
           );
           
+          const issueDate = computeIssueDate(
+            monthCursor.getFullYear(),
+            monthCursor.getMonth(),
+            account.dia_emissao
+          );
+          
           // Buscar dados do pagamento no histórico
           const paymentData = paymentHistory?.find(
             (p: any) => p.account_id === account.id && p.paid_month === monthStr
@@ -167,6 +187,7 @@ export default function Index() {
           expandedAccounts.push({
             ...account,
             __dueDate: dueDate.toISOString(),
+            __issueDate: issueDate.toISOString(),
             __period: monthStr,
             __isPreviousMonth: monthStr < currentMonthStr,
             __isPaid: true,
@@ -191,21 +212,22 @@ export default function Index() {
     // Pendências do mês atual: período == mês atual
     const currentMonthPendencies = pendingAccounts.filter(acc => acc.__period === currentMonthStr);
 
-    // Ordenar por dia_vencimento
-    const sortByDueDay = (a: any, b: any) => {
-      const dayA = parseInt(a.dia_vencimento) || 31;
-      const dayB = parseInt(b.dia_vencimento) || 31;
-      return dayA - dayB;
+    // Ordenar por data de emissão
+    const sortByIssueDate = (a: any, b: any) => {
+      const issueDateA = a.__issueDate ? new Date(a.__issueDate).getTime() : 0;
+      const issueDateB = b.__issueDate ? new Date(b.__issueDate).getTime() : 0;
+      return issueDateA - issueDateB;
     };
 
-    previousMonthPendencies.sort(sortByDueDay);
-    currentMonthPendencies.sort(sortByDueDay);
+    previousMonthPendencies.sort(sortByIssueDate);
+    currentMonthPendencies.sort(sortByIssueDate);
     deliveredAccounts.sort((a, b) => {
-      // Ordenar entregues por período (mais recente primeiro)
+      // Ordenar entregues por período e depois por data de emissão (mais recente primeiro)
       if (a.__period && b.__period) {
-        return b.__period.localeCompare(a.__period);
+        const periodCompare = b.__period.localeCompare(a.__period);
+        if (periodCompare !== 0) return periodCompare;
       }
-      return sortByDueDay(a, b);
+      return sortByIssueDate(a, b);
     });
 
     // Combinar: pendências anteriores primeiro, depois pendências do mês atual, depois entregues
@@ -245,7 +267,7 @@ export default function Index() {
           
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Nova Fatura Recorrente
+            Nova Conta
           </Button>
         </div>
 
