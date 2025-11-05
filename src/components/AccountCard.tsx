@@ -89,9 +89,9 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
       return <Badge className="bg-destructive text-destructive-foreground">Entrega atrasada</Badge>;
     }
     if (isDueToday) {
-      return <Badge className="bg-warning text-warning-foreground">Pendente de entrega</Badge>;
+      return <Badge className="bg-warning text-warning-foreground">Entrega hoje</Badge>;
     }
-    return <Badge variant="secondary">Futuro a receber</Badge>;
+    return <Badge variant="secondary">Pendente</Badge>;
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -123,7 +123,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
               </div>
               {account.__period && (
                 <div className="text-xs text-muted-foreground font-medium">
-                  {format(new Date(account.__period + "-01"), "MMMM 'de' yyyy", { locale: ptBR })}
+                  {format(new Date(account.__period), "MMMM 'de' yyyy", { locale: ptBR })} 
                 </div>
               )}
             </div>
