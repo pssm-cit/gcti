@@ -4,10 +4,21 @@ import { Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
 export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("admin").eq("id", user.id).single();
+      if (data && (data as any).admin === true) setIsAdmin(true);
+    })();
+  }, []);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -64,6 +75,18 @@ export function Navbar() {
                 Histórico
               </Link>
             </Button>
+            {isAdmin && (
+              <Button
+                asChild
+                variant={isActive("/admin") ? "default" : "ghost"}
+                size="sm"
+              >
+                <Link to="/admin">
+                  <History className="w-4 h-4 mr-2" />
+                  Admin
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
 

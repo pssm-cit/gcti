@@ -24,6 +24,7 @@ const loginSchema = z.object({
 export default function Auth() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("login");
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -96,7 +97,7 @@ export default function Auth() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: signupEmail,
       password: signupPassword,
       options: {
@@ -118,7 +119,33 @@ export default function Auth() {
       return;
     }
 
-    toast.success("Conta criada com sucesso!");
+    // Criar/atualizar perfil como pendente de aprovação
+    try {
+      const newUserId = data?.user?.id;
+      if (newUserId) {
+        // Tenta inserir/atualizar com colunas avançadas; se não existirem, faz fallback só com full_name
+        const { error: profileUpsertError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: newUserId,
+            full_name: signupFullName,
+            status: "pending",
+            admin: false,
+            tenant_id: null,
+          } as any, { onConflict: "id" } as any);
+
+        if (profileUpsertError && profileUpsertError.code === "42703") {
+          // Colunas ainda não existem: salva apenas o nome
+          await supabase.from("profiles").upsert({ id: newUserId, full_name: signupFullName } as any, { onConflict: "id" } as any);
+        }
+      }
+    } catch (e) {
+      // Ignorar erros de schema aqui, já que a aprovação será feita pelo admin
+      console.error(e);
+    }
+
+    toast.success("Cadastro criado! Aguarde aprovação do administrador.");
+    setActiveTab("login");
   };
 
   return (
@@ -134,10 +161,11 @@ export default function Auth() {
           <CardDescription>Gestão de Contas Financeiras</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Cadastrar</TabsTrigger>
+              {/* Oculta o tab visual do cadastro e usa link abaixo */}
+              <TabsTrigger value="signup" className="hidden">Cadastrar</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
@@ -168,6 +196,12 @@ export default function Auth() {
                   {loading ? "Entrando..." : "Entrar"}
                 </Button>
               </form>
+              <div className="mt-4 text-center text-sm">
+                <span className="text-muted-foreground">Novo por aqui? </span>
+                <button type="button" className="text-primary underline" onClick={() => setActiveTab("signup")}>
+                  Cadastre-se
+                </button>
+              </div>
             </TabsContent>
             
             <TabsContent value="signup">
@@ -208,6 +242,11 @@ export default function Auth() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Criando conta..." : "Criar Conta"}
                 </Button>
+                <div className="mt-2 text-center text-sm">
+                  <button type="button" className="text-muted-foreground underline" onClick={() => setActiveTab("login")}>
+                    Voltar para login
+                  </button>
+                </div>
               </form>
             </TabsContent>
           </Tabs>

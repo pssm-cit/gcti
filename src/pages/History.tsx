@@ -27,6 +27,7 @@ export default function History() {
   const [deliveryDateEnd, setDeliveryDateEnd] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<any | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [profileStatus, setProfileStatus] = useState<string>("approved");
 
   useEffect(() => {
     loadSuppliers();
@@ -44,6 +45,9 @@ export default function History() {
   const loadSuppliers = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    const { data: profile } = await supabase.from("profiles").select("status").eq("id", user.id).single();
+    if (profile && (profile as any).status) setProfileStatus((profile as any).status);
 
     const { data, error } = await supabase
       .from("suppliers")
@@ -204,6 +208,11 @@ export default function History() {
       <Navbar />
       
       <main className="container mx-auto px-4 py-8">
+        {profileStatus !== "approved" && (
+          <div className="mb-6 p-4 border rounded-md bg-muted/30">
+            Sua conta está pendente de aprovação. Aguarde um administrador aprovar seu acesso.
+          </div>
+        )}
         <div className="mb-8">
           <h2 className="text-3xl font-bold mb-2">Histórico de Contas</h2>
           <p className="text-muted-foreground">
