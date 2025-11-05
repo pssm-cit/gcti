@@ -5,10 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
 
@@ -31,17 +29,6 @@ interface EditAccountDialogProps {
 export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: EditAccountDialogProps) {
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [showNewSupplier, setShowNewSupplier] = useState(false);
-  const [supplierFormData, setSupplierFormData] = useState({
-    name: "",
-    cpf_cnpj: "",
-    invoice_sent_by_email: false,
-    invoice_sent_by_portal: false,
-    portal_url: "",
-    portal_login: "",
-    portal_password: "",
-    observations: "",
-  });
   const [isInitialized, setIsInitialized] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -58,25 +45,42 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
       if (open && account) {
         setIsInitialized(false);
         
-        // Primeiro carregar os suppliers
-        const { data: suppliersData, error } = await supabase
+        // Carregar fornecedores ativos
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: activeSuppliers, error: activeError } = await supabase
           .from("suppliers")
           .select("*")
+          .eq("user_id", user.id)
+          .eq("status", true)
           .order("name");
 
-        if (error) {
-          console.error("Error loading suppliers:", error);
+        if (activeError) {
+          console.error("Error loading suppliers:", activeError);
           return;
         }
-        
-        // Primeiro definir os suppliers
-        setSuppliers(suppliersData || []);
+
+        // Se a conta tem um fornecedor específico, buscar ele também (mesmo que inativo)
+        let allSuppliers = [...(activeSuppliers || [])];
+        if (account.supplier_id) {
+          const { data: currentSupplier } = await supabase
+            .from("suppliers")
+            .select("*")
+            .eq("id", account.supplier_id)
+            .single();
+
+          if (currentSupplier && !activeSuppliers?.find(s => s.id === currentSupplier.id)) {
+            allSuppliers.push(currentSupplier);
+          }
+        }
+
+        setSuppliers(allSuppliers);
 
         // Aguardar um tick para garantir que o estado foi atualizado
         await new Promise(resolve => setTimeout(resolve, 0));
 
         // Depois de carregar os suppliers, preencher o formData
-        // Tratar data_fim que pode vir como string ISO ou formato YYYY-MM-DD
         const dataFim = account.data_fim 
           ? (account.data_fim.includes('T') 
               ? format(parseISO(account.data_fim), "yyyy-MM-dd")
@@ -111,55 +115,6 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
 
     initializeData();
   }, [open, account]);
-
-  const handleAddSupplier = async () => {
-    if (!supplierFormData.name.trim()) {
-      toast.error("Digite um nome para o fornecedor");
-      return;
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const supplierData: any = {
-      name: supplierFormData.name,
-      user_id: user.id,
-      cpf_cnpj: supplierFormData.cpf_cnpj || null,
-      invoice_sent_by_email: supplierFormData.invoice_sent_by_email,
-      invoice_sent_by_portal: supplierFormData.invoice_sent_by_portal,
-      portal_url: supplierFormData.invoice_sent_by_portal ? supplierFormData.portal_url || null : null,
-      portal_login: supplierFormData.invoice_sent_by_portal ? supplierFormData.portal_login || null : null,
-      portal_password: supplierFormData.invoice_sent_by_portal ? supplierFormData.portal_password || null : null,
-      observations: supplierFormData.observations || null,
-    };
-
-    const { data, error } = await supabase
-      .from("suppliers")
-      .insert([supplierData])
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Erro ao adicionar fornecedor");
-      console.error(error);
-      return;
-    }
-
-    toast.success("Fornecedor adicionado!");
-    setSuppliers([...suppliers, data]);
-    setFormData({ ...formData, supplier_id: data.id });
-    setSupplierFormData({
-      name: "",
-      cpf_cnpj: "",
-      invoice_sent_by_email: false,
-      invoice_sent_by_portal: false,
-      portal_url: "",
-      portal_login: "",
-      portal_password: "",
-      observations: "",
-    });
-    setShowNewSupplier(false);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,162 +174,27 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Fornecedor</Label>
-            {!showNewSupplier ? (
-                             <div className="flex gap-2">
-                 <Select
-                   key={`select-${suppliers.length}-${formData.supplier_id}`}
-                   value={formData.supplier_id || undefined}
-                   onValueChange={(value) => {
-                     if (value && value !== formData.supplier_id) {
-                       setFormData({ ...formData, supplier_id: value });
-                     }
-                   }}
-                   disabled={!isInitialized || suppliers.length === 0}
-                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder={isInitialized ? "Selecione um fornecedor" : "Carregando..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowNewSupplier(true)}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4 border rounded-lg p-4">
-                <div className="space-y-2">
-                  <Label htmlFor="supplier_name">Nome *</Label>
-                  <Input
-                    id="supplier_name"
-                    placeholder="Nome do fornecedor"
-                    value={supplierFormData.name}
-                    onChange={(e) => setSupplierFormData({ ...supplierFormData, name: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cpf_cnpj">CPF/CNPJ</Label>
-                  <Input
-                    id="cpf_cnpj"
-                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
-                    value={supplierFormData.cpf_cnpj}
-                    onChange={(e) => setSupplierFormData({ ...supplierFormData, cpf_cnpj: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Fatura enviada por:</Label>
-                  <div className="flex items-center space-x-6">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="invoice_email"
-                        checked={supplierFormData.invoice_sent_by_email}
-                        onCheckedChange={(checked) =>
-                          setSupplierFormData({ ...supplierFormData, invoice_sent_by_email: checked === true })
-                        }
-                      />
-                      <Label htmlFor="invoice_email" className="font-normal cursor-pointer">
-                        E-mail
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="invoice_portal"
-                        checked={supplierFormData.invoice_sent_by_portal}
-                        onCheckedChange={(checked) =>
-                          setSupplierFormData({ ...supplierFormData, invoice_sent_by_portal: checked === true })
-                        }
-                      />
-                      <Label htmlFor="invoice_portal" className="font-normal cursor-pointer">
-                        Portal
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-
-                {supplierFormData.invoice_sent_by_portal && (
-                  <div className="space-y-3 border-t pt-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="portal_url">URL do Portal</Label>
-                      <Input
-                        id="portal_url"
-                        type="url"
-                        placeholder="https://portal.exemplo.com.br"
-                        value={supplierFormData.portal_url}
-                        onChange={(e) => setSupplierFormData({ ...supplierFormData, portal_url: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="portal_login">Login</Label>
-                      <Input
-                        id="portal_login"
-                        placeholder="Login do portal"
-                        value={supplierFormData.portal_login}
-                        onChange={(e) => setSupplierFormData({ ...supplierFormData, portal_login: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="portal_password">Senha</Label>
-                      <Input
-                        id="portal_password"
-                        type="password"
-                        placeholder="Senha do portal"
-                        value={supplierFormData.portal_password}
-                        onChange={(e) => setSupplierFormData({ ...supplierFormData, portal_password: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="supplier_observations">Observações</Label>
-                  <Textarea
-                    id="supplier_observations"
-                    placeholder="Observações sobre o fornecedor"
-                    value={supplierFormData.observations}
-                    onChange={(e) => setSupplierFormData({ ...supplierFormData, observations: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button type="button" onClick={handleAddSupplier}>
-                    Adicionar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowNewSupplier(false);
-                      setSupplierFormData({
-                        name: "",
-                        cpf_cnpj: "",
-                        invoice_sent_by_email: false,
-                        invoice_sent_by_portal: false,
-                        portal_url: "",
-                        portal_login: "",
-                        portal_password: "",
-                        observations: "",
-                      });
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Select
+              key={`select-${suppliers.length}-${formData.supplier_id}`}
+              value={formData.supplier_id || undefined}
+              onValueChange={(value) => {
+                if (value && value !== formData.supplier_id) {
+                  setFormData({ ...formData, supplier_id: value });
+                }
+              }}
+              disabled={!isInitialized || suppliers.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={isInitialized ? "Selecione um fornecedor" : "Carregando..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.map((supplier) => (
+                  <SelectItem key={supplier.id} value={supplier.id}>
+                    {supplier.name} {!supplier.status ? "(Inativo)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

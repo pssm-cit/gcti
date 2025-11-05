@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, Home, History, FileText } from "lucide-react";
+import { LogOut, Home, History, FileText, Building2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -40,6 +40,17 @@ export function Navbar() {
               <Link to="/">
                 <Home className="w-4 h-4 mr-2" />
                 Dashboard
+              </Link>
+            </Button>
+            
+            <Button
+              asChild
+              variant={isActive("/suppliers") ? "default" : "ghost"}
+              size="sm"
+            >
+              <Link to="/suppliers">
+                <Building2 className="w-4 h-4 mr-2" />
+                Fornecedores
               </Link>
             </Button>
             

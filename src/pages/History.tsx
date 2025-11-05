@@ -47,7 +47,7 @@ export default function History() {
 
     const { data, error } = await supabase
       .from("suppliers")
-      .select("id, name")
+      .select("id, name, status")
       .eq("user_id", user.id)
       .order("name");
 
@@ -226,7 +226,7 @@ export default function History() {
                     <SelectItem value="all">Todos os fornecedores</SelectItem>
                     {suppliers.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
+                        {supplier.name} {supplier.status === false ? "(Inativo)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
