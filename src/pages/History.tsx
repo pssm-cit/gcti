@@ -162,6 +162,7 @@ export default function History() {
           invoice_numbers: payment.invoice_numbers || [],
           recipient: payment.recipient || "",
           is_delivered: true,
+          cost_centers_snapshot: payment.cost_centers_snapshot || [],
         };
       })
       .filter(Boolean); // Remover nulls
@@ -431,6 +432,37 @@ export default function History() {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Rateio dos Centros de Custo */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">Rateio (Centros de Custo)</Label>
+                {Array.isArray(selectedAccount.cost_centers_snapshot) && selectedAccount.cost_centers_snapshot.length > 0 ? (
+                  <div className="border rounded-md divide-y">
+                    {selectedAccount.cost_centers_snapshot.map((cc: any, idx: number) => (
+                      <div key={idx} className="grid grid-cols-3 gap-2 p-2 text-sm">
+                        <div className="font-medium">{cc.code}</div>
+                        <div className="text-muted-foreground">{Number(cc.percent)}%</div>
+                        <div className="text-right">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(cc.value) || 0)}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="grid grid-cols-3 gap-2 p-2 text-sm bg-muted/30">
+                      <div className="font-medium">Total</div>
+                      <div className="text-muted-foreground">
+                        {selectedAccount.cost_centers_snapshot.reduce((s: number, c: any) => s + Number(c.percent || 0), 0)}%
+                      </div>
+                      <div className="text-right font-medium">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          selectedAccount.cost_centers_snapshot.reduce((s: number, c: any) => s + Number(c.value || 0), 0)
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sem rateio registrado para esta entrega.</p>
+                )}
               </div>
             </div>
           )}

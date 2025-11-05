@@ -1,8 +1,13 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Calendar, DollarSign, Building2, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CheckCircle2, Calendar, DollarSign, Building2, FileText, Lock } from "lucide-react";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { MarkDeliveredDialog } from "./MarkDeliveredDialog";
 import { EditAccountDialog } from "./EditAccountDialog";
 import { format, isPast, isToday } from "date-fns";
@@ -16,6 +21,10 @@ interface AccountCardProps {
 export function AccountCard({ account, onUpdate }: AccountCardProps) {
   const [markDeliveredDialogOpen, setMarkDeliveredDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [portalDialogOpen, setPortalDialogOpen] = useState(false);
+  const [portalPassword, setPortalPassword] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [showPortalCreds, setShowPortalCreds] = useState(false);
   
   // Calcular data de vencimento; usa override (__dueDate) se fornecido
   const getCurrentMonthDueDate = () => {
@@ -108,6 +117,43 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
     setMarkDeliveredDialogOpen(true);
   };
 
+  const canShowLock = account?.suppliers?.portal === true;
+
+  const handleLockClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPortalDialogOpen(true);
+    setPortalPassword("");
+    setShowPortalCreds(false);
+  };
+
+  const verifyPassword = async () => {
+    setVerifying(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) {
+        toast.error("Usuário não autenticado");
+        setVerifying(false);
+        return;
+      }
+      // Reautenticar para verificar a senha; mantém a mesma conta
+      const { error } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: portalPassword,
+      });
+      if (error) {
+        toast.error("Senha incorreta");
+        setVerifying(false);
+        return;
+      }
+      setShowPortalCreds(true);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao verificar senha");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   return (
     <>
       <Card 
@@ -127,7 +173,14 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
                 </div>
               )}
             </div>
-            {getStatusBadge()}
+            <div className="flex items-center gap-2">
+              {canShowLock && (
+                <Button variant="ghost" size="icon" onClick={handleLockClick} title="Portal do Fornecedor">
+                  <Lock className="w-4 h-4" />
+                </Button>
+              )}
+              {getStatusBadge()}
+            </div>
           </div>
         </CardHeader>
         
@@ -204,6 +257,57 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
         account={account}
         onSuccess={onUpdate}
       />
+
+      {/* Portal Credentials Dialog */}
+      <Dialog open={portalDialogOpen} onOpenChange={setPortalDialogOpen}>
+        <DialogContent className="max-w-md" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Portal do Fornecedor</DialogTitle>
+            <DialogDescription>
+              Confirme sua senha para visualizar as credenciais do portal.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!showPortalCreds ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="portalPassword">Senha</Label>
+                <Input
+                  id="portalPassword"
+                  type="password"
+                  value={portalPassword}
+                  onChange={(e) => setPortalPassword(e.target.value)}
+                  placeholder="Digite sua senha"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPortalDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={verifyPassword} disabled={verifying || !portalPassword}>
+                  {verifying ? "Verificando..." : "Confirmar"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-sm text-muted-foreground">URL</Label>
+                <p className="text-sm break-all">{account.suppliers?.portal_url || '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm text-muted-foreground">Login</Label>
+                <p className="text-sm">{account.suppliers?.portal_login || '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm text-muted-foreground">Senha</Label>
+                <p className="text-sm">{account.suppliers?.portal_password || '-'}</p>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setPortalDialogOpen(false)}>Fechar</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

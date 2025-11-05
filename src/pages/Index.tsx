@@ -102,7 +102,11 @@ export default function Index() {
         *,
         suppliers (
           id,
-          name
+          name,
+          portal,
+          portal_url,
+          portal_login,
+          portal_password
         )
       `)
       .or(`data_fim.is.null,data_fim.gte.${todayStr}`)
