@@ -100,14 +100,7 @@ export default function Index() {
       .from("accounts")
       .select(`
         *,
-        suppliers (
-          id,
-          name,
-          portal,
-          portal_url,
-          portal_login,
-          portal_password
-        )
+        suppliers (*)
       `)
       .or(`data_fim.is.null,data_fim.gte.${todayStr}`)
       .order("dia_vencimento", { ascending: true });
