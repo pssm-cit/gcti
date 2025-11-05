@@ -31,13 +31,26 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     const dueDay = parseInt(account.dia_vencimento) || 1;
+    const issueDay = parseInt(account.dia_emissao) || 1;
     
-    // Criar data de vencimento no mês atual
+    // Se dia de emissão > dia de vencimento, vencimento é do mês seguinte
+    let dueYear = currentYear;
+    let dueMonth = currentMonth;
+    
+    if (issueDay > dueDay) {
+      dueMonth = dueMonth + 1;
+      if (dueMonth > 11) {
+        dueMonth = 0;
+        dueYear = dueYear + 1;
+      }
+    }
+    
+    // Criar data de vencimento
     // Usar o último dia do mês se dia_vencimento for maior que os dias do mês
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const daysInMonth = new Date(dueYear, dueMonth + 1, 0).getDate();
     const actualDueDay = Math.min(dueDay, daysInMonth);
     
-    return new Date(currentYear, currentMonth, actualDueDay);
+    return new Date(dueYear, dueMonth, actualDueDay);
   };
 
   // Calcular data de emissão; usa override (__issueDate) se fornecido

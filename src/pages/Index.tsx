@@ -61,15 +61,28 @@ export default function Index() {
   };
 
   const loadAccounts = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
     const now = new Date();
     const currentMonthStr = format(now, "yyyy-MM");
 
     // Helper para calcular vencimento para um mês/ano informados
-    const computeDueDate = (year: number, monthIndex0Based: number, dueDay: number) => {
-      const daysInMonth = new Date(year, monthIndex0Based + 1, 0).getDate();
+    // Se dia_emissao > dia_vencimento, o vencimento é do mês seguinte
+    const computeDueDate = (year: number, monthIndex0Based: number, dueDay: number, issueDay: number) => {
+      let dueYear = year;
+      let dueMonth = monthIndex0Based;
+      
+      // Se dia de emissão > dia de vencimento, vencimento é do mês seguinte
+      if (issueDay > dueDay) {
+        dueMonth = dueMonth + 1;
+        if (dueMonth > 11) {
+          dueMonth = 0;
+          dueYear = dueYear + 1;
+        }
+      }
+      
+      const daysInMonth = new Date(dueYear, dueMonth + 1, 0).getDate();
       const actualDueDay = Math.min(parseInt(String(dueDay)) || 1, daysInMonth);
-      return new Date(year, monthIndex0Based, actualDueDay);
+      return new Date(dueYear, dueMonth, actualDueDay);
     };
 
     // Helper para calcular data de emissão para um mês/ano informados
@@ -89,7 +102,7 @@ export default function Index() {
           name
         )
       `)
-      .or(`data_fim.is.null,data_fim.gte.${today}`)
+      .or(`data_fim.is.null,data_fim.gte.${todayStr}`)
       .order("dia_vencimento", { ascending: true });
 
     if (accountsError) {
@@ -122,9 +135,11 @@ export default function Index() {
       });
     }
 
-    // Expandir contas em cards para todos os meses desde criação até hoje
+    // Expandir contas em cards baseado na data de emissão
     const baseAccounts = accountsData || [];
     const expandedAccounts: any[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     for (const account of baseAccounts) {
       const createdAt = account.created_at ? new Date(account.created_at) : new Date();
@@ -136,60 +151,63 @@ export default function Index() {
       // Obter meses pagos para esta conta
       const paidMonths = paidMonthsMap.get(account.id) || new Set<string>();
 
-      // Gerar cards para cada mês desde criação até hoje (ou data_fim)
+      // Gerar cards baseado na data de emissão
+      // Começar do mês de criação até o mês atual (ou data_fim)
       let monthCursor = new Date(createdMonth);
       while (monthCursor <= currentMonth && (!endMonth || monthCursor <= endMonth)) {
         const monthStr = format(monthCursor, "yyyy-MM");
         
-        // Pular meses já pagos
-        if (!paidMonths.has(monthStr)) {
-          const dueDate = computeDueDate(
-            monthCursor.getFullYear(),
-            monthCursor.getMonth(),
-            account.dia_vencimento
-          );
-          
-          const issueDate = computeIssueDate(
-            monthCursor.getFullYear(),
-            monthCursor.getMonth(),
-            account.dia_emissao
-          );
-          
-          const isPreviousMonth = monthStr < currentMonthStr;
+        // Calcular data de emissão para este mês
+        const issueDate = computeIssueDate(
+          monthCursor.getFullYear(),
+          monthCursor.getMonth(),
+          account.dia_emissao
+        );
+        
+        // Calcular data de vencimento (pode ser do mês seguinte se dia_emissao > dia_vencimento)
+        const dueDate = computeDueDate(
+          monthCursor.getFullYear(),
+          monthCursor.getMonth(),
+          account.dia_vencimento,
+          account.dia_emissao
+        );
+        
+        // Verificar se este card deve ser exibido baseado na data de emissão
+        // Card deve aparecer quando a data de emissão já passou ou está no mês atual
+        const issueDateOnly = new Date(issueDate.getFullYear(), issueDate.getMonth(), issueDate.getDate());
+        const shouldShow = issueDateOnly <= today || format(issueDate, "yyyy-MM") === currentMonthStr;
+        
+        if (!shouldShow) {
+          // Avançar para o próximo mês
+          monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1);
+          continue;
+        }
+        
+        // Verificar se este mês já foi pago
+        const paidMonthKey = format(issueDate, "yyyy-MM");
+        if (!paidMonths.has(paidMonthKey)) {
+          const isPreviousMonth = issueDateOnly < today && format(issueDate, "yyyy-MM") < currentMonthStr;
           
           expandedAccounts.push({
             ...account,
             __dueDate: dueDate.toISOString(),
             __issueDate: issueDate.toISOString(),
-            __period: monthStr,
+            __period: paidMonthKey,
             __isPreviousMonth: isPreviousMonth,
             __isPaid: false
           });
         } else {
-          // Meses pagos aparecem como entregues
-          const dueDate = computeDueDate(
-            monthCursor.getFullYear(),
-            monthCursor.getMonth(),
-            account.dia_vencimento
-          );
-          
-          const issueDate = computeIssueDate(
-            monthCursor.getFullYear(),
-            monthCursor.getMonth(),
-            account.dia_emissao
-          );
-          
-          // Buscar dados do pagamento no histórico
+          // Mês pago aparece como entregue
           const paymentData = paymentHistory?.find(
-            (p: any) => p.account_id === account.id && p.paid_month === monthStr
+            (p: any) => p.account_id === account.id && p.paid_month === paidMonthKey
           );
           
           expandedAccounts.push({
             ...account,
             __dueDate: dueDate.toISOString(),
             __issueDate: issueDate.toISOString(),
-            __period: monthStr,
-            __isPreviousMonth: monthStr < currentMonthStr,
+            __period: paidMonthKey,
+            __isPreviousMonth: format(issueDate, "yyyy-MM") < currentMonthStr,
             __isPaid: true,
             invoice_numbers: paymentData?.invoice_numbers || account.invoice_numbers,
             recipient: paymentData?.recipient || account.recipient,
@@ -206,11 +224,25 @@ export default function Index() {
     const pendingAccounts = expandedAccounts.filter(acc => !acc.__isPaid);
     const deliveredAccounts = expandedAccounts.filter(acc => acc.__isPaid);
 
-    // Identificar pendências de meses anteriores: período < mês atual
-    const previousMonthPendencies = pendingAccounts.filter(acc => acc.__period && acc.__period < currentMonthStr);
+    // Identificar pendências de meses anteriores: data de emissão passada e não paga
+    const previousMonthPendencies = pendingAccounts.filter(acc => {
+      if (!acc.__issueDate) return false;
+      const issueDate = new Date(acc.__issueDate);
+      issueDate.setHours(0, 0, 0, 0);
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      return issueDate < todayDate;
+    });
 
-    // Pendências do mês atual: período == mês atual
-    const currentMonthPendencies = pendingAccounts.filter(acc => acc.__period === currentMonthStr);
+    // Pendências do mês atual: data de emissão é hoje ou no futuro próximo
+    const currentMonthPendencies = pendingAccounts.filter(acc => {
+      if (!acc.__issueDate) return false;
+      const issueDate = new Date(acc.__issueDate);
+      issueDate.setHours(0, 0, 0, 0);
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      return issueDate >= todayDate || format(issueDate, "yyyy-MM") === currentMonthStr;
+    });
 
     // Ordenar por data de emissão
     const sortByIssueDate = (a: any, b: any) => {
@@ -285,8 +317,12 @@ export default function Index() {
           <div className="space-y-6">
             {/* Pendências de meses anteriores */}
             {accounts.filter(acc => {
-              const currentMonth = format(new Date(), "yyyy-MM");
-              return !acc.__isPaid && acc.__period && acc.__period < currentMonth;
+              if (!acc.__issueDate) return false;
+              const issueDate = new Date(acc.__issueDate);
+              issueDate.setHours(0, 0, 0, 0);
+              const todayDate = new Date();
+              todayDate.setHours(0, 0, 0, 0);
+              return !acc.__isPaid && issueDate < todayDate;
             }).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-destructive">
@@ -295,8 +331,12 @@ export default function Index() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {accounts
                     .filter(acc => {
-                      const currentMonth = format(new Date(), "yyyy-MM");
-                      return !acc.__isPaid && acc.__period && acc.__period < currentMonth;
+                      if (!acc.__issueDate) return false;
+                      const issueDate = new Date(acc.__issueDate);
+                      issueDate.setHours(0, 0, 0, 0);
+                      const todayDate = new Date();
+                      todayDate.setHours(0, 0, 0, 0);
+                      return !acc.__isPaid && issueDate < todayDate;
                     })
                     .map((account, index) => (
                       <AccountCard 
@@ -311,8 +351,12 @@ export default function Index() {
 
             {/* Pendências do mês atual */}
             {accounts.filter(acc => {
-              const currentMonth = format(new Date(), "yyyy-MM");
-              return !acc.__isPaid && acc.__period === currentMonth;
+              if (!acc.__issueDate) return false;
+              const issueDate = new Date(acc.__issueDate);
+              issueDate.setHours(0, 0, 0, 0);
+              const todayDate = new Date();
+              todayDate.setHours(0, 0, 0, 0);
+              return !acc.__isPaid && (issueDate >= todayDate || format(issueDate, "yyyy-MM") === format(todayDate, "yyyy-MM"));
             }).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">
@@ -321,8 +365,12 @@ export default function Index() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {accounts
                     .filter(acc => {
-                      const currentMonth = format(new Date(), "yyyy-MM");
-                      return !acc.__isPaid && acc.__period === currentMonth;
+                      if (!acc.__issueDate) return false;
+                      const issueDate = new Date(acc.__issueDate);
+                      issueDate.setHours(0, 0, 0, 0);
+                      const todayDate = new Date();
+                      todayDate.setHours(0, 0, 0, 0);
+                      return !acc.__isPaid && (issueDate >= todayDate || format(issueDate, "yyyy-MM") === format(todayDate, "yyyy-MM"));
                     })
                     .map((account, index) => (
                       <AccountCard 
