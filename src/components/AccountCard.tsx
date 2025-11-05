@@ -123,7 +123,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
               </div>
               {account.__period && (
                 <div className="text-xs text-muted-foreground font-medium">
-                  {format(new Date(account.__period), "MMMM 'de' yyyy", { locale: ptBR })} 
+                  {format(new Date(account.__period + "-01"), "MMMM 'ddee' yyyy", { locale: ptBR })} 
                 </div>
               )}
             </div>

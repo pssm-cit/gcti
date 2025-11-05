@@ -362,7 +362,7 @@ export default function History() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Detalhes do Pagamento</DialogTitle>
+            <DialogTitle>Detalhes</DialogTitle>
             <DialogDescription>
               Informações completas sobre o registro selecionado
             </DialogDescription>
