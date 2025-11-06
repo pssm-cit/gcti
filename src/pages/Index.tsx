@@ -103,7 +103,23 @@ export default function Index() {
       return new Date(year, monthIndex0Based, actualIssueDay);
     };
 
+    // Obter tenant_id do perfil do usuário primeiro
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      toast.error("Erro: usuário não tem tenant configurado");
+      return;
+    }
+
     // Carregar todas as contas que devem aparecer (data_fim NULL ou >= hoje)
+    // As políticas RLS já filtram por tenant_id automaticamente
     const { data: accountsData, error: accountsError } = await supabase
       .from("accounts")
       .select(`
@@ -120,13 +136,10 @@ export default function Index() {
     }
 
     // Carregar histórico de pagamentos para filtrar meses já pagos
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
     const { data: paymentHistory, error: historyError } = await supabase
       .from("account_payment_history")
       .select("account_id, paid_month, invoice_numbers, recipient, paid_date")
-      .eq("user_id", user.id);
+      .eq("tenant_id", profile.tenant_id);
 
     if (historyError) {
       console.error("Erro ao carregar histórico de pagamentos:", historyError);

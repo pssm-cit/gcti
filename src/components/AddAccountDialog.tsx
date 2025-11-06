@@ -52,10 +52,22 @@ export function AddAccountDialog({ open, onOpenChange, onSuccess }: AddAccountDi
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Obter tenant_id do perfil do usuário
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      console.error("Usuário não tem tenant_id configurado");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("suppliers")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("tenant_id", profile.tenant_id)
       .eq("status", true)
       .order("name");
 
@@ -116,8 +128,22 @@ export function AddAccountDialog({ open, onOpenChange, onSuccess }: AddAccountDi
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Obter tenant_id do perfil do usuário
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      toast.error("Erro: usuário não tem tenant configurado");
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.from("accounts").insert([{
       user_id: user.id,
+      tenant_id: profile.tenant_id,
       supplier_id: formData.supplier_id,
       description: formData.description,
       amount: parseFloat(formData.amount),

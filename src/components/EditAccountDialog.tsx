@@ -53,10 +53,22 @@ export function EditAccountDialog({ open, onOpenChange, account, onSuccess }: Ed
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Obter tenant_id do perfil do usuário
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", user.id)
+          .single();
+
+        if (!userProfile?.tenant_id) {
+          console.error("Erro: usuário não tem tenant configurado");
+          return;
+        }
+
         const { data: activeSuppliers, error: activeError } = await supabase
           .from("suppliers")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("tenant_id", userProfile.tenant_id)
           .eq("status", true)
           .order("name");
 

@@ -56,10 +56,22 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
     const paidMonth = account.__period || format(new Date(), "yyyy-MM");
     const currentDate = format(new Date(), "yyyy-MM-dd");
 
-    // Obter user_id
+    // Obter tenant_id do perfil do usuário
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Erro: usuário não autenticado");
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      toast.error("Erro: usuário não tem tenant configurado");
       setLoading(false);
       return;
     }
@@ -93,6 +105,7 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
       .insert({
         account_id: account.id,
         user_id: user.id,
+        tenant_id: profile.tenant_id,
         paid_month: paidMonth,
         paid_date: currentDate,
         invoice_numbers: validInvoices,

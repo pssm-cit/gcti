@@ -60,10 +60,23 @@ export default function Suppliers() {
       return;
     }
 
+    // Obter tenant_id do perfil do usuário
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      toast.error("Erro: usuário não tem tenant configurado");
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("suppliers")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("tenant_id", profile.tenant_id)
       .order("name");
 
     if (error) {
@@ -142,9 +155,22 @@ export default function Suppliers() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Obter tenant_id do perfil do usuário
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      toast.error("Erro: usuário não tem tenant configurado");
+      return;
+    }
+
     const supplierData: any = {
       name: formData.name,
       user_id: user.id,
+      tenant_id: profile.tenant_id,
       cpf_cnpj: formData.cpf_cnpj || null,
       invoice_sent_by_email: formData.invoice_sent_by_email,
       invoice_sent_by_portal: formData.invoice_sent_by_portal,

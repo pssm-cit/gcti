@@ -46,13 +46,23 @@ export default function History() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: profile } = await supabase.from("profiles").select("status").eq("id", user.id).single();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("status, tenant_id")
+      .eq("id", user.id)
+      .single();
+    
     if (profile && (profile as any).status) setProfileStatus((profile as any).status);
+
+    if (!profile?.tenant_id) {
+      console.error("Erro: usuário não tem tenant configurado");
+      return;
+    }
 
     const { data, error } = await supabase
       .from("suppliers")
       .select("id, name, status")
-      .eq("user_id", user.id)
+      .eq("tenant_id", profile.tenant_id)
       .order("name");
 
     if (error) {
@@ -66,9 +76,21 @@ export default function History() {
   const loadAccounts = async () => {
     setLoading(true);
 
-    // Obter user_id
+    // Obter tenant_id do perfil do usuário
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      toast.error("Erro: usuário não tem tenant configurado");
       setLoading(false);
       return;
     }
@@ -77,7 +99,7 @@ export default function History() {
     let query = supabase
       .from("account_payment_history")
       .select("*")
-      .eq("user_id", user.id);
+      .eq("tenant_id", profile.tenant_id);
 
     // Aplicar filtros de data de entrega
     if (deliveryDateStart) {
