@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ interface SupplierFormData {
 }
 
 export default function Suppliers() {
+  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [filteredSuppliers, setFilteredSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,8 +47,33 @@ export default function Suppliers() {
   });
 
   useEffect(() => {
-    loadSuppliers();
-  }, []);
+    // Verificar autenticação e aprovação
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("status")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile && (profile as any).status === "pending") {
+          await supabase.auth.signOut();
+          toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+          navigate("/auth");
+          return;
+        }
+      }
+
+      loadSuppliers();
+    })();
+  }, [navigate]);
 
   useEffect(() => {
     filterSuppliers();

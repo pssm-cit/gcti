@@ -23,18 +23,61 @@ export default function Index() {
   const [profileStatus, setProfileStatus] = useState<string>("approved");
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!session) {
         navigate("/auth");
+        return;
       }
+
+      // Verificar status do perfil quando houver sessão
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("status")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile && (profile as any).status === "pending") {
+          // Usuário pendente: fazer logout e redirecionar
+          await supabase.auth.signOut();
+          toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+          navigate("/auth");
+          return;
+        }
+      }
+
+      setSession(session);
+      setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         navigate("/auth");
+        setLoading(false);
+        return;
       }
+
+      // Verificar status do perfil quando houver sessão
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("status")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile && (profile as any).status === "pending") {
+          // Usuário pendente: fazer logout e redirecionar
+          await supabase.auth.signOut();
+          toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+          navigate("/auth");
+          setLoading(false);
+          return;
+        }
+      }
+
+      setSession(session);
       setLoading(false);
     });
 
@@ -48,14 +91,25 @@ export default function Index() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const { data } = await supabase.from("profiles").select("status").eq("id", user.id).single();
-        if (data && (data as any).status) setProfileStatus((data as any).status);
+        if (data && (data as any).status) {
+          const status = (data as any).status;
+          setProfileStatus(status);
+          
+          // Se status for pending, fazer logout e redirecionar
+          if (status === "pending") {
+            await supabase.auth.signOut();
+            toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+            navigate("/auth");
+            return;
+          }
+        }
       })();
       loadAccounts();
       
       // Verificar e resetar status quando necessário (ao montar e ao mudar de mês)
       resetRecurringAccountsStatus();
     }
-  }, [session]);
+  }, [session, navigate]);
 
   // Função para resetar status de contas recorrentes quando mudar de mês
   const resetRecurringAccountsStatus = async () => {

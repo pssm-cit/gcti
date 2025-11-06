@@ -36,14 +36,46 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
+        // Verificar status do perfil antes de redirecionar
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("status")
+            .eq("id", user.id)
+            .single();
+          
+          if (profile && (profile as any).status === "pending") {
+            // Usuário pendente: fazer logout e não redirecionar
+            await supabase.auth.signOut();
+            toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+            return;
+          }
+        }
         navigate("/");
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
+        // Verificar status do perfil antes de redirecionar
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("status")
+            .eq("id", user.id)
+            .single();
+          
+          if (profile && (profile as any).status === "pending") {
+            // Usuário pendente: fazer logout e não redirecionar
+            await supabase.auth.signOut();
+            toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+            return;
+          }
+        }
         navigate("/");
       }
     });
@@ -76,6 +108,23 @@ export default function Auth() {
         toast.error("Erro ao fazer login: " + error.message);
       }
       return;
+    }
+
+    // Verificar status do perfil após login bem-sucedido
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile && (profile as any).status === "pending") {
+        // Usuário pendente: fazer logout e mostrar mensagem
+        await supabase.auth.signOut();
+        toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+        return;
+      }
     }
 
     toast.success("Login realizado com sucesso!");
@@ -144,6 +193,9 @@ export default function Auth() {
       // Ignorar erros de schema aqui, já que a aprovação será feita pelo admin
       console.error(e);
     }
+
+    // Fazer logout imediatamente após cadastro para não criar sessão automática
+    await supabase.auth.signOut();
 
     // Mostrar alerta informativo sobre aprovação pendente
     toast.success("Cadastro realizado com sucesso! Seu cadastro está pendente de aprovação pelo administrador.", {

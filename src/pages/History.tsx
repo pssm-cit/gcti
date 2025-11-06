@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function History() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [filteredAccounts, setFilteredAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,9 +32,34 @@ export default function History() {
   const [profileStatus, setProfileStatus] = useState<string>("approved");
 
   useEffect(() => {
-    loadSuppliers();
-    loadAccounts();
-  }, []);
+    // Verificar autenticação e aprovação
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("status")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile && (profile as any).status === "pending") {
+          await supabase.auth.signOut();
+          toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+          navigate("/auth");
+          return;
+        }
+      }
+
+      loadSuppliers();
+      loadAccounts();
+    })();
+  }, [navigate]);
 
   useEffect(() => {
     loadAccounts();
