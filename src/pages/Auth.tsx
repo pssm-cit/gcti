@@ -120,6 +120,7 @@ export default function Auth() {
     }
 
     // Criar/atualizar perfil como pendente de aprovação
+    // IMPORTANTE: Não criar tenant automaticamente - o admin fará isso na aprovação
     try {
       const newUserId = data?.user?.id;
       if (newUserId) {
@@ -131,7 +132,7 @@ export default function Auth() {
             full_name: signupFullName,
             status: "pending",
             admin: false,
-            tenant_id: null,
+            tenant_id: null, // Garantir que tenant_id seja null - será definido pelo admin na aprovação
           } as any, { onConflict: "id" } as any);
 
         if (profileUpsertError && profileUpsertError.code === "42703") {
@@ -144,8 +145,15 @@ export default function Auth() {
       console.error(e);
     }
 
-    toast.success("Cadastro criado! Aguarde aprovação do administrador.");
+    // Mostrar alerta informativo sobre aprovação pendente
+    toast.success("Cadastro realizado com sucesso! Seu cadastro está pendente de aprovação pelo administrador.", {
+      duration: 6000,
+    });
     setActiveTab("login");
+    // Limpar formulário
+    setSignupFullName("");
+    setSignupEmail("");
+    setSignupPassword("");
   };
 
   return (
