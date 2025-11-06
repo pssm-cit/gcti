@@ -221,13 +221,7 @@ export default function Auth() {
           <CardDescription>Gestão de Contas Financeiras</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              {/* Oculta o tab visual do cadastro e usa link abaixo */}
-              <TabsTrigger value="signup" className="hidden">Cadastrar</TabsTrigger>
-            </TabsList>
-            
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">        
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -257,7 +251,6 @@ export default function Auth() {
                 </Button>
               </form>
               <div className="mt-4 text-center text-sm">
-                <span className="text-muted-foreground">Novo por aqui? </span>
                 <button type="button" className="text-primary underline" onClick={() => setActiveTab("signup")}>
                   Cadastre-se
                 </button>

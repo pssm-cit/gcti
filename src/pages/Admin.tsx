@@ -143,7 +143,7 @@ export default function Admin() {
 
   const handleOpenUserDialog = (user: any) => {
     setEditingUser(user);
-    setUserTenantId(user.tenant_id || "");
+    setUserTenantId(user.tenant_id || "none");
     setUserIsActive(user.status === "approved");
     setUserDialogOpen(true);
   };
@@ -151,7 +151,7 @@ export default function Admin() {
   const handleCloseUserDialog = () => {
     setUserDialogOpen(false);
     setEditingUser(null);
-    setUserTenantId("");
+    setUserTenantId("none");
     setUserIsActive(true);
   };
 
@@ -164,7 +164,7 @@ export default function Admin() {
         status: userIsActive ? "approved" : "pending",
       };
       
-      if (userTenantId) {
+      if (userTenantId && userTenantId !== "none") {
         updatePayload.tenant_id = userTenantId;
       } else {
         updatePayload.tenant_id = null;
@@ -425,14 +425,14 @@ export default function Admin() {
                 <Label htmlFor="user-tenant">Tenant</Label>
                 <div className="flex gap-2">
                   <Select
-                    value={userTenantId}
+                    value={userTenantId || "none"}
                     onValueChange={setUserTenantId}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um tenant" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem tenant</SelectItem>
+                      <SelectItem value="none">Sem tenant</SelectItem>
                       {tenants.map((t) => (
                         <SelectItem key={t.id} value={t.id}>
                           {t.name}
