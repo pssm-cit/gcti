@@ -15,11 +15,7 @@ export function Navbar() {
     (async () => {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) {
-          console.error("Erro ao obter usuário:", userError);
-          return;
-        }
-        if (!user) return;
+        if (userError || !user) return;
         
         const { data, error } = await supabase
           .from("profiles")
@@ -27,20 +23,13 @@ export function Navbar() {
           .eq("id", user.id)
           .single();
         
-        if (error) {
-          console.error("Erro ao verificar admin:", error);
-          return;
-        }
+        if (error) return;
         
-        console.log("Dados do perfil:", data);
         if (data && (data as any).admin === true) {
-          console.log("Usuário é admin, mostrando menu Admin");
           setIsAdmin(true);
-        } else {
-          console.log("Usuário não é admin, admin =", (data as any)?.admin);
         }
       } catch (err) {
-        console.error("Erro inesperado ao verificar admin:", err);
+        // Silenciar erros
       }
     })();
   }, []);
