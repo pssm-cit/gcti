@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileText } from "lucide-react";
 import { z } from "zod";
 
 const signupSchema = z.object({
@@ -213,11 +212,12 @@ export default function Auth() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <FileText className="w-8 h-8 text-primary" />
-            </div>
+            <img 
+              src="/logo-portosecosuldeminas.png" 
+              alt="GCTI Logo" 
+              className="h-16 w-auto"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold">GCTI</CardTitle>
           <CardDescription>Gestão de Contas Financeiras</CardDescription>
         </CardHeader>
         <CardContent>

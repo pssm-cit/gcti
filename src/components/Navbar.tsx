@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, Home, History, FileText, Building2 } from "lucide-react";
+import { LogOut, Home, History, Building2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -50,10 +50,11 @@ export function Navbar() {
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
-            <FileText className="w-6 h-6 text-primary" />
-            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              GCTI
-            </h1>
+            <img 
+              src="/logo-portosecosuldeminas.png" 
+              alt="GCTI Logo" 
+              className="h-8 w-auto"
+            />
           </Link>
           
           <div className="flex gap-2">
