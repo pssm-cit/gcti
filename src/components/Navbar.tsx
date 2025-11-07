@@ -51,7 +51,7 @@ export function Navbar() {
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
             <img 
-              src="https://portosecosuldeminas.com.br/wp-content/uploads/2022/12/logo-portosecosuldeminas-header.png" 
+              src="https://portosecosuldeminas.com.br/wp-content/uploads/2022/12/logo-portosecosuldeminas-header-b.png" 
               alt="PSSM" 
               className="h-8 w-auto"
             />
