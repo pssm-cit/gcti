@@ -213,7 +213,7 @@ export default function Auth() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/logo-portosecosuldeminas.png" 
+              src="https://portosecosuldeminas.com.br/wp-content/uploads/2022/12/logo-portosecosuldeminas-header.png" 
               alt="PSSM" 
               className="h-16 w-auto"
             />
