@@ -214,7 +214,7 @@ export default function Auth() {
           <div className="flex justify-center mb-4">
             <img 
               src="/logo-portosecosuldeminas.png" 
-              alt="GCTI Logo" 
+              alt="PSSM" 
               className="h-16 w-auto"
             />
           </div>

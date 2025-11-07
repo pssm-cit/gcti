@@ -52,7 +52,7 @@ export function Navbar() {
           <Link to="/" className="flex items-center gap-2">
             <img 
               src="/logo-portosecosuldeminas.png" 
-              alt="GCTI Logo" 
+              alt="PSSM" 
               className="h-8 w-auto"
             />
           </Link>
