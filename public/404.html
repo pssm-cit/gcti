@@ -5,28 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PSSM</title>
     <script>
-      // Redirect for GitHub Pages with base path /gcti/
-      // This script redirects 404 errors to index.html preserving the route
-      var pathSegmentsToKeep = 1; // Keep /gcti/ segment
-      
-      var l = window.location;
-      var pathname = l.pathname;
-      
-      // Remove the base path /gcti/ from the pathname to get the route
-      var segments = pathname.split('/').filter(function(segment) {
-        return segment !== '';
-      });
-      
-      // Keep only segments after the base path
-      var route = segments.slice(pathSegmentsToKeep).join('/');
-      
-      // Build the redirect URL
-      var redirectUrl = l.protocol + '//' + l.host + '/gcti/' + 
-        (route ? '?/' + route : '') +
-        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-        l.hash;
-      
-      window.location.replace(redirectUrl);
+      (function() {
+        try {
+          // Save the original URL so the SPA can restore it
+          sessionStorage.setItem("gh_redirect", window.location.href);
+
+          var path = window.location.pathname.split("/").filter(Boolean);
+          // Keep the base path (e.g., /gcti/) and redirect there
+          var base = path.length > 0 ? "/" + path[0] + "/" : "/";
+          window.location.replace(base);
+        } catch (error) {
+          console.error("Erro ao redirecionar 404.", error);
+          window.location.replace("/");
+        }
+      })();
     </script>
   </head>
   <body>

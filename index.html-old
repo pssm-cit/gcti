@@ -19,27 +19,23 @@
   <body>
     <div id="root"></div>
     <script>
-      // Restore the original path after GitHub Pages redirect
+      // Process GitHub Pages 404 redirects
+      // Convert query string routes (?/auth) back to normal routes (/gcti/auth)
       (function() {
-        try {
-          var redirect = sessionStorage.getItem("gh_redirect");
-          if (!redirect) return;
-
-          sessionStorage.removeItem("gh_redirect");
-          var redirectUrl = new URL(redirect);
-
-          if (redirectUrl.origin !== window.location.origin) return;
-
-          var newPath = redirectUrl.pathname + redirectUrl.search + redirectUrl.hash;
-          if (newPath && newPath !== window.location.pathname + window.location.search + window.location.hash) {
-            window.history.replaceState(null, "", newPath);
-          }
-        } catch (error) {
-          console.error("Erro ao processar redirecionamento:", error);
+        var location = window.location;
+        if (location.search.length > 0 && location.search.indexOf('?/') === 0) {
+          var route = location.search.slice(2).split('&')[0].replace(/~and~/g, '&');
+          // Get the base path from pathname (e.g., /gcti/)
+          var basePath = location.pathname.split('/').slice(0, -1).join('/') || '';
+          if (!basePath.endsWith('/')) basePath += '/';
+          // Build new URL with base path + route
+          var newUrl = location.origin + basePath + 
+            (route.startsWith('/') ? route.slice(1) : route) + 
+            location.hash;
+          window.history.replaceState(null, '', newUrl);
         }
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
