@@ -39,42 +39,47 @@ export default function Auth() {
     console.log("[Auth.tsx] useEffect - onAuthStateChange iniciado");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[Auth.tsx] onAuthStateChange - event:", event, "session:", !!session);
-      if (session && event === "SIGNED_IN") {
-        console.log("[Auth.tsx] Usuário autenticado, verificando perfil");
-        // Verificar status do perfil antes de redirecionar
-        try {
-          const { data: { user }, error: userError } = await supabase.auth.getUser();
-          if (userError) {
-            console.error("[Auth.tsx] Erro ao obter usuário:", userError);
-            return;
-          }
-          
-          if (user) {
-            console.log("[Auth.tsx] Buscando perfil do usuário");
-            const { data: profile, error: profileError } = await supabase
-              .from("profiles")
-              .select("status")
-              .eq("id", user.id)
-              .single();
-            
-            if (profileError) {
-              console.error("[Auth.tsx] Erro ao buscar perfil:", profileError);
-              // Continuar mesmo com erro no perfil
-            }
-            
-            if (profile && (profile as any).status === "pending") {
-              // Usuário pendente: fazer logout e não redirecionar
-              console.log("[Auth.tsx] Usuário pendente, fazendo logout");
-              await supabase.auth.signOut();
-              toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+      if (session) {
+        console.log("[Auth.tsx] Sessão detectada, event:", event);
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          console.log("[Auth.tsx] Usuário autenticado, verificando perfil");
+          setLoading(false);
+          // Verificar status do perfil antes de redirecionar
+          try {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError) {
+              console.error("[Auth.tsx] Erro ao obter usuário:", userError);
               return;
             }
+            
+            if (user) {
+              console.log("[Auth.tsx] Buscando perfil do usuário");
+              const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("status")
+                .eq("id", user.id)
+                .single();
+              
+              if (profileError) {
+                console.error("[Auth.tsx] Erro ao buscar perfil:", profileError);
+                // Continuar mesmo com erro no perfil
+              }
+              
+              if (profile && (profile as any).status === "pending") {
+                // Usuário pendente: fazer logout e não redirecionar
+                console.log("[Auth.tsx] Usuário pendente, fazendo logout");
+                await supabase.auth.signOut();
+                toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+                return;
+              }
+            }
+            
+            console.log("[Auth.tsx] Redirecionando para /");
+            navigate("/", { replace: true });
+          } catch (error) {
+            console.error("[Auth.tsx] Erro no onAuthStateChange:", error);
+            setLoading(false);
           }
-          
-          console.log("[Auth.tsx] Redirecionando para /");
-          navigate("/", { replace: true });
-        } catch (error) {
-          console.error("[Auth.tsx] Erro no onAuthStateChange:", error);
         }
       }
     });
@@ -100,7 +105,7 @@ export default function Auth() {
     setLoading(true);
 
     console.log("[Auth.tsx] Tentando fazer login");
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
       password: loginPassword,
     });
@@ -117,8 +122,11 @@ export default function Auth() {
     }
 
     console.log("[Auth.tsx] Login bem-sucedido, aguardando onAuthStateChange");
-    // Não fazer setLoading(false) aqui - deixar o onAuthStateChange cuidar da navegação
-    // O onAuthStateChange vai redirecionar automaticamente
+    // O onAuthStateChange vai cuidar da navegação, mas vamos resetar o loading após um delay
+    // para evitar que fique travado se o onAuthStateChange não disparar
+    setTimeout(() => {
+      setLoading(false);
+    }, 2000);
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -300,4 +308,3 @@ export default function Auth() {
     </div>
   );
 }
-ccc
