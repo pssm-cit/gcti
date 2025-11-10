@@ -35,48 +35,49 @@ export default function Index() {
       }
 
       console.log("[Index.tsx] Sessão encontrada, verificando perfil");
-      try {
-        // Verificar status do perfil quando houver sessão
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) {
-          console.error("[Index.tsx] Erro ao obter usuário:", userError);
-          setLoading(false);
-          navigate("/auth");
-          return;
-        }
-        
-        if (user) {
-          console.log("[Index.tsx] Buscando perfil do usuário");
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("status")
-            .eq("id", user.id)
-            .single();
-          
-          if (profileError) {
-            console.error("[Index.tsx] Erro ao buscar perfil:", profileError);
-            // Continuar mesmo com erro no perfil
-          }
-          
-          if (profile && (profile as any).status === "pending") {
-            // Usuário pendente: fazer logout e redirecionar
-            console.log("[Index.tsx] Usuário pendente, fazendo logout");
-            await supabase.auth.signOut();
-            toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
-            setLoading(false);
-            navigate("/auth");
+      
+      // Configurar sessão imediatamente para não travar a UI
+      setSession(session);
+      setLoading(false);
+      
+      // Verificar perfil de forma assíncrona sem bloquear
+      (async () => {
+        try {
+          console.log("[Index.tsx] Obtendo usuário...");
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError) {
+            console.error("[Index.tsx] Erro ao obter usuário:", userError);
             return;
           }
+          
+          if (user) {
+            console.log("[Index.tsx] Buscando perfil do usuário...");
+            const { data: profile, error: profileError } = await supabase
+              .from("profiles")
+              .select("status")
+              .eq("id", user.id)
+              .single();
+            
+            if (profileError) {
+              console.error("[Index.tsx] Erro ao buscar perfil:", profileError);
+              // Continuar mesmo com erro no perfil
+              return;
+            }
+            
+            console.log("[Index.tsx] Perfil obtido:", profile);
+            if (profile && (profile as any).status === "pending") {
+              // Usuário pendente: fazer logout e redirecionar
+              console.log("[Index.tsx] Usuário pendente, fazendo logout");
+              await supabase.auth.signOut();
+              toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+              navigate("/auth");
+              return;
+            }
+          }
+        } catch (error) {
+          console.error("[Index.tsx] Erro ao verificar perfil:", error);
         }
-
-        console.log("[Index.tsx] Configurando sessão e finalizando loading");
-        setSession(session);
-        setLoading(false);
-      } catch (error) {
-        console.error("[Index.tsx] Erro no onAuthStateChange:", error);
-        setLoading(false);
-        navigate("/auth");
-      }
+      })();
     });
 
     // Remover getSession() pois está causando timeout
