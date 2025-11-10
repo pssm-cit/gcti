@@ -56,37 +56,80 @@ export default function Index() {
     });
 
     console.log("[Index.tsx] Verificando sessão atual");
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log("[Index.tsx] getSession - session:", !!session);
-      if (!session) {
-        console.log("[Index.tsx] Sem sessão no getSession, redirecionando para /auth");
-        navigate("/auth");
-        setLoading(false);
-        return;
-      }
-
-      // Verificar status do perfil quando houver sessão
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("status")
-          .eq("id", user.id)
-          .single();
-        
-        if (profile && (profile as any).status === "pending") {
-          // Usuário pendente: fazer logout e redirecionar
-          await supabase.auth.signOut();
-          toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
-          navigate("/auth");
+    console.log("[Index.tsx] Cliente supabase:", !!supabase);
+    console.log("[Index.tsx] supabase.auth:", !!supabase.auth);
+    
+    // Adicionar timeout para evitar travamento
+    const timeoutId = setTimeout(() => {
+      console.warn("[Index.tsx] Timeout no getSession após 5 segundos");
+      setLoading(false);
+      navigate("/auth");
+    }, 5000);
+    
+    supabase.auth.getSession()
+      .then(async ({ data: { session }, error }) => {
+        clearTimeout(timeoutId);
+        console.log("[Index.tsx] getSession - resposta recebida");
+        if (error) {
+          console.error("[Index.tsx] Erro no getSession:", error);
           setLoading(false);
+          navigate("/auth");
           return;
         }
-      }
+        console.log("[Index.tsx] getSession - session:", !!session);
+        if (!session) {
+          console.log("[Index.tsx] Sem sessão no getSession, redirecionando para /auth");
+          setLoading(false);
+          navigate("/auth");
+          return;
+        }
 
-      setSession(session);
-      setLoading(false);
-    });
+        console.log("[Index.tsx] Sessão encontrada, verificando perfil");
+        // Verificar status do perfil quando houver sessão
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error("[Index.tsx] Erro ao obter usuário:", userError);
+          setLoading(false);
+          navigate("/auth");
+          return;
+        }
+        console.log("[Index.tsx] Usuário obtido:", !!user);
+        if (user) {
+          console.log("[Index.tsx] Buscando perfil do usuário");
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("status")
+            .eq("id", user.id)
+            .single();
+          
+          if (profileError) {
+            console.error("[Index.tsx] Erro ao buscar perfil:", profileError);
+            setLoading(false);
+            return;
+          }
+          
+          console.log("[Index.tsx] Perfil obtido:", profile);
+          if (profile && (profile as any).status === "pending") {
+            // Usuário pendente: fazer logout e redirecionar
+            console.log("[Index.tsx] Usuário pendente, fazendo logout");
+            await supabase.auth.signOut();
+            toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+            setLoading(false);
+            navigate("/auth");
+            return;
+          }
+        }
+
+        console.log("[Index.tsx] Configurando sessão e finalizando loading");
+        setSession(session);
+        setLoading(false);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        console.error("[Index.tsx] Erro capturado no getSession:", error);
+        setLoading(false);
+        navigate("/auth");
+      });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
