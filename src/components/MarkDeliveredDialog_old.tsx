@@ -77,20 +77,12 @@ export function MarkDeliveredDialog({ open, onOpenChange, account, onSuccess }: 
     }
 
     // Verificar se já existe pagamento para este mês
-    const { data: existingPayment, error: existingPaymentError } = await supabase
+    const { data: existingPayment } = await supabase
       .from("account_payment_history")
       .select("id")
       .eq("account_id", account.id)
       .eq("paid_month", paidMonth)
-      .limit(1)
-      .maybeSingle();
-
-    if (existingPaymentError && existingPaymentError.code !== "PGRST116") {
-      console.error("Erro ao verificar histórico de pagamento:", existingPaymentError);
-      toast.error("Erro ao verificar histórico de pagamento");
-      setLoading(false);
-      return;
-    }
+      .single();
 
     if (existingPayment) {
       toast.error("Este mês já foi marcado como pago");
