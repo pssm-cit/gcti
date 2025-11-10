@@ -75,7 +75,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
 
 			toast.success("Senha alterada com sucesso");
 			toast.message?.("Importante", {
-				description: "Sua senha foi atualizada. Você será redirecionado para a tela de login.",
+				description: "Sua senha foi atualizada com sucesso.",
 			} as any);
 
 			// Encerrar sessão e redirecionar para login

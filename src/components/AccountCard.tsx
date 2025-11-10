@@ -95,10 +95,10 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
       return <Badge className="bg-success text-success-foreground">Entregue</Badge>;
     }
     if (isOverdue) {
-      return <Badge className="bg-destructive text-destructive-foreground">Entrega atrasada</Badge>;
+      return <Badge className="bg-destructive text-destructive-foreground">Pendente - Vencido</Badge>;
     }
     if (isDueToday) {
-      return <Badge className="bg-warning text-warning-foreground">Entrega hoje</Badge>;
+      return <Badge className="bg-warning text-warning-foreground">Pendente - Vence hoje</Badge>;
     }
     return <Badge variant="secondary">Pendente</Badge>;
   };
