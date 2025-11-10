@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 
 interface ChangePasswordDialogProps {
 	open: boolean;
@@ -17,7 +16,6 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
 	const [newPassword, setNewPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [loading, setLoading] = useState(false);
-	const navigate = useNavigate();
 
 	const resetForm = () => {
 		setCurrentPassword("");
@@ -74,15 +72,8 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
 			}
 
 			toast.success("Senha alterada com sucesso");
-			toast.message?.("Importante", {
-				description: "Sua senha foi atualizada. Você será redirecionado para a tela de login.",
-			} as any);
-
-			// Encerrar sessão e redirecionar para login
-			await supabase.auth.signOut();
 			onOpenChange(false);
 			resetForm();
-			navigate("/auth");
 		} catch (err) {
 			toast.error("Erro ao alterar senha");
 		} finally {
