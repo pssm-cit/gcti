@@ -21,7 +21,6 @@ const loginSchema = z.object({
 });
 
 export default function Auth() {
-  console.log("[Auth.tsx] Componente Auth renderizando");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
@@ -36,24 +35,18 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
 
   useEffect(() => {
-    console.log("[Auth.tsx] useEffect - onAuthStateChange iniciado");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[Auth.tsx] onAuthStateChange - event:", event, "session:", !!session);
       if (session) {
-        console.log("[Auth.tsx] Sessão detectada, event:", event);
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-          console.log("[Auth.tsx] Usuário autenticado, verificando perfil");
           setLoading(false);
           // Verificar status do perfil antes de redirecionar
           try {
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError) {
-              console.error("[Auth.tsx] Erro ao obter usuário:", userError);
               return;
             }
             
             if (user) {
-              console.log("[Auth.tsx] Buscando perfil do usuário");
               const { data: profile, error: profileError } = await supabase
                 .from("profiles")
                 .select("status")
@@ -61,34 +54,26 @@ export default function Auth() {
                 .single();
               
               if (profileError) {
-                console.error("[Auth.tsx] Erro ao buscar perfil:", profileError);
                 // Continuar mesmo com erro no perfil
               }
               
               if (profile && (profile as any).status === "pending") {
-                // Usuário pendente: fazer logout e não redirecionar
-                console.log("[Auth.tsx] Usuário pendente, fazendo logout");
                 await supabase.auth.signOut();
                 toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
                 return;
               }
             }
             
-            console.log("[Auth.tsx] Redirecionando para /");
             navigate("/", { replace: true });
           } catch (error) {
-            console.error("[Auth.tsx] Erro no onAuthStateChange:", error);
+            console.error("Erro no onAuthStateChange:", error);
             setLoading(false);
           }
         }
       }
     });
 
-    // Remover getSession aqui pois está causando timeout
-    // O onAuthStateChange já cuida da navegação
-
     return () => {
-      console.log("[Auth.tsx] Limpando subscription");
       subscription.unsubscribe();
     };
   }, [navigate]);
@@ -104,14 +89,12 @@ export default function Auth() {
 
     setLoading(true);
 
-    console.log("[Auth.tsx] Tentando fazer login");
     const { error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
       password: loginPassword,
     });
 
     if (error) {
-      console.error("[Auth.tsx] Erro no login:", error);
       setLoading(false);
       if (error.message.includes("Invalid login credentials")) {
         toast.error("Email ou senha incorretos");
@@ -121,7 +104,6 @@ export default function Auth() {
       return;
     }
 
-    console.log("[Auth.tsx] Login bem-sucedido, aguardando onAuthStateChange");
     // O onAuthStateChange vai cuidar da navegação, mas vamos resetar o loading após um delay
     // para evitar que fique travado se o onAuthStateChange não disparar
     setTimeout(() => {

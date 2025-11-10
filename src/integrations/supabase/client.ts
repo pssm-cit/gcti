@@ -9,10 +9,6 @@ const SUPABASE_PUBLISHABLE_KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-console.log("[supabase/client.ts] Criando cliente Supabase");
-console.log("[supabase/client.ts] URL:", SUPABASE_URL);
-console.log("[supabase/client.ts] Key existe:", !!SUPABASE_PUBLISHABLE_KEY);
-
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -20,5 +16,3 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
-
-console.log("[supabase/client.ts] Cliente Supabase criado");

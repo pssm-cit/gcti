@@ -12,7 +12,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function Index() {
-  console.log("[Index.tsx] Componente Index renderizando");
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,18 +23,13 @@ export default function Index() {
   const [profileStatus, setProfileStatus] = useState<string>("approved");
 
   useEffect(() => {
-    console.log("[Index.tsx] useEffect - onAuthStateChange iniciado");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[Index.tsx] onAuthStateChange - event:", event, "session:", !!session);
       if (!session) {
-        console.log("[Index.tsx] Sem sessão, redirecionando para /auth");
         setLoading(false);
         navigate("/auth");
         return;
       }
 
-      console.log("[Index.tsx] Sessão encontrada, verificando perfil");
-      
       // Configurar sessão imediatamente para não travar a UI
       setSession(session);
       setLoading(false);
@@ -43,15 +37,12 @@ export default function Index() {
       // Verificar perfil de forma assíncrona sem bloquear
       (async () => {
         try {
-          console.log("[Index.tsx] Obtendo usuário...");
           const { data: { user }, error: userError } = await supabase.auth.getUser();
           if (userError) {
-            console.error("[Index.tsx] Erro ao obter usuário:", userError);
             return;
           }
           
           if (user) {
-            console.log("[Index.tsx] Buscando perfil do usuário...");
             const { data: profile, error: profileError } = await supabase
               .from("profiles")
               .select("status")
@@ -59,15 +50,10 @@ export default function Index() {
               .single();
             
             if (profileError) {
-              console.error("[Index.tsx] Erro ao buscar perfil:", profileError);
-              // Continuar mesmo com erro no perfil
               return;
             }
             
-            console.log("[Index.tsx] Perfil obtido:", profile);
             if (profile && (profile as any).status === "pending") {
-              // Usuário pendente: fazer logout e redirecionar
-              console.log("[Index.tsx] Usuário pendente, fazendo logout");
               await supabase.auth.signOut();
               toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
               navigate("/auth");
@@ -75,34 +61,23 @@ export default function Index() {
             }
           }
         } catch (error) {
-          console.error("[Index.tsx] Erro ao verificar perfil:", error);
+          console.error("Erro ao verificar perfil:", error);
         }
       })();
     });
 
-    // Remover getSession() pois está causando timeout
-    // O onAuthStateChange já cuida de verificar a sessão
-    console.log("[Index.tsx] Aguardando onAuthStateChange para verificar sessão");
-
     return () => {
-      console.log("[Index.tsx] Limpando subscription");
       subscription.unsubscribe();
     };
   }, [navigate]);
 
   useEffect(() => {
-    console.log("[Index.tsx] useEffect session - session:", !!session);
     if (session) {
-      console.log("[Index.tsx] Sessão disponível, carregando dados");
       // Carregar status do perfil
       (async () => {
         try {
           const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            console.log("[Index.tsx] Nenhum usuário encontrado");
-            return;
-          }
-          console.log("[Index.tsx] Carregando status do perfil");
+          if (!user) return;
           const { data } = await supabase.from("profiles").select("status").eq("id", user.id).single();
           if (data && (data as any).status) {
             const status = (data as any).status;
@@ -117,14 +92,12 @@ export default function Index() {
             }
           }
         } catch (error) {
-          console.error("[Index.tsx] Erro ao carregar perfil:", error);
+          console.error("Erro ao carregar perfil:", error);
         }
       })();
-      console.log("[Index.tsx] Carregando contas");
       loadAccounts();
       
       // Verificar e resetar status quando necessário (ao montar e ao mudar de mês)
-      console.log("[Index.tsx] Resetando status de contas recorrentes");
       resetRecurringAccountsStatus();
     }
   }, [session, navigate]);
