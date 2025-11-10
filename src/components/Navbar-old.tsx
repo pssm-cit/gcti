@@ -1,17 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, Home, History, Building2, KeyRound } from "lucide-react";
+import { LogOut, Home, History, Building2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { ChangePasswordDialog } from "./ChangePasswordDialog";
 
 export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [changePwdOpen, setChangePwdOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -107,18 +105,11 @@ export function Navbar() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setChangePwdOpen(true)}>
-            <KeyRound className="w-4 h-4 mr-2" />
-            Alterar senha
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Sair
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <LogOut className="w-4 h-4 mr-2" />
+          Sair
+        </Button>
       </div>
-      <ChangePasswordDialog open={changePwdOpen} onOpenChange={setChangePwdOpen} />
     </nav>
   );
 }
