@@ -21,7 +21,6 @@ const loginSchema = z.object({
 });
 
 export default function Auth() {
-  console.log("[Auth.tsx] Componente Auth renderizando");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
@@ -36,9 +35,7 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
 
   useEffect(() => {
-    console.log("[Auth.tsx] useEffect - onAuthStateChange iniciado");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[Auth.tsx] onAuthStateChange - event:", event, "session:", !!session);
       if (session) {
         // Verificar status do perfil antes de redirecionar
         const { data: { user } } = await supabase.auth.getUser();

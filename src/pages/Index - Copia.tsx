@@ -12,7 +12,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function Index() {
-  console.log("[Index.tsx] Componente Index renderizando");
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,11 +23,8 @@ export default function Index() {
   const [profileStatus, setProfileStatus] = useState<string>("approved");
 
   useEffect(() => {
-    console.log("[Index.tsx] useEffect - onAuthStateChange iniciado");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[Index.tsx] onAuthStateChange - event:", event, "session:", !!session);
       if (!session) {
-        console.log("[Index.tsx] Sem sessão, redirecionando para /auth");
         navigate("/auth");
         return;
       }
@@ -55,11 +51,8 @@ export default function Index() {
       setLoading(false);
     });
 
-    console.log("[Index.tsx] Verificando sessão atual");
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log("[Index.tsx] getSession - session:", !!session);
       if (!session) {
-        console.log("[Index.tsx] Sem sessão no getSession, redirecionando para /auth");
         navigate("/auth");
         setLoading(false);
         return;
