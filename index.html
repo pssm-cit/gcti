@@ -18,28 +18,6 @@
 
   <body>
     <div id="root"></div>
-    <script>
-      // Restore the original path after GitHub Pages redirect
-      (function() {
-        try {
-          var redirect = sessionStorage.getItem("gh_redirect");
-          if (!redirect) return;
-
-          sessionStorage.removeItem("gh_redirect");
-          var redirectUrl = new URL(redirect);
-
-          if (redirectUrl.origin !== window.location.origin) return;
-
-          var newPath = redirectUrl.pathname + redirectUrl.search + redirectUrl.hash;
-          if (newPath && newPath !== window.location.pathname + window.location.search + window.location.hash) {
-            window.history.replaceState(null, "", newPath);
-          }
-        } catch (error) {
-          console.error("Erro ao processar redirecionamento:", error);
-        }
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
