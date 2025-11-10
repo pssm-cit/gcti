@@ -29,62 +29,101 @@ export default function Index() {
       console.log("[Index.tsx] onAuthStateChange - event:", event, "session:", !!session);
       if (!session) {
         console.log("[Index.tsx] Sem sessão, redirecionando para /auth");
+        setLoading(false);
         navigate("/auth");
         return;
       }
 
-      // Verificar status do perfil quando houver sessão
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("status")
-          .eq("id", user.id)
-          .single();
-        
-        if (profile && (profile as any).status === "pending") {
-          // Usuário pendente: fazer logout e redirecionar
-          await supabase.auth.signOut();
-          toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+      console.log("[Index.tsx] Sessão encontrada, verificando perfil");
+      try {
+        // Verificar status do perfil quando houver sessão
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error("[Index.tsx] Erro ao obter usuário:", userError);
+          setLoading(false);
           navigate("/auth");
           return;
         }
-      }
+        
+        if (user) {
+          console.log("[Index.tsx] Buscando perfil do usuário");
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("status")
+            .eq("id", user.id)
+            .single();
+          
+          if (profileError) {
+            console.error("[Index.tsx] Erro ao buscar perfil:", profileError);
+            // Continuar mesmo com erro no perfil
+          }
+          
+          if (profile && (profile as any).status === "pending") {
+            // Usuário pendente: fazer logout e redirecionar
+            console.log("[Index.tsx] Usuário pendente, fazendo logout");
+            await supabase.auth.signOut();
+            toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+            setLoading(false);
+            navigate("/auth");
+            return;
+          }
+        }
 
-      setSession(session);
-      setLoading(false);
+        console.log("[Index.tsx] Configurando sessão e finalizando loading");
+        setSession(session);
+        setLoading(false);
+      } catch (error) {
+        console.error("[Index.tsx] Erro no onAuthStateChange:", error);
+        setLoading(false);
+        navigate("/auth");
+      }
     });
 
     // Remover getSession() pois está causando timeout
     // O onAuthStateChange já cuida de verificar a sessão
     console.log("[Index.tsx] Aguardando onAuthStateChange para verificar sessão");
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("[Index.tsx] Limpando subscription");
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   useEffect(() => {
+    console.log("[Index.tsx] useEffect session - session:", !!session);
     if (session) {
+      console.log("[Index.tsx] Sessão disponível, carregando dados");
       // Carregar status do perfil
       (async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data } = await supabase.from("profiles").select("status").eq("id", user.id).single();
-        if (data && (data as any).status) {
-          const status = (data as any).status;
-          setProfileStatus(status);
-          
-          // Se status for pending, fazer logout e redirecionar
-          if (status === "pending") {
-            await supabase.auth.signOut();
-            toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
-            navigate("/auth");
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            console.log("[Index.tsx] Nenhum usuário encontrado");
             return;
           }
+          console.log("[Index.tsx] Carregando status do perfil");
+          const { data } = await supabase.from("profiles").select("status").eq("id", user.id).single();
+          if (data && (data as any).status) {
+            const status = (data as any).status;
+            setProfileStatus(status);
+            
+            // Se status for pending, fazer logout e redirecionar
+            if (status === "pending") {
+              await supabase.auth.signOut();
+              toast.error("Seu cadastro está pendente de aprovação pelo administrador.");
+              navigate("/auth");
+              return;
+            }
+          }
+        } catch (error) {
+          console.error("[Index.tsx] Erro ao carregar perfil:", error);
         }
       })();
+      console.log("[Index.tsx] Carregando contas");
       loadAccounts();
       
       // Verificar e resetar status quando necessário (ao montar e ao mudar de mês)
+      console.log("[Index.tsx] Resetando status de contas recorrentes");
       resetRecurringAccountsStatus();
     }
   }, [session, navigate]);
