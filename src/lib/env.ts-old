@@ -7,12 +7,6 @@ const envSchema = z.object({
   BASE_URL: z.string().default("/"),
 });
 
-console.log("[env.ts] Carregando variáveis de ambiente");
-console.log("[env.ts] BASE_URL (raw):", import.meta.env.BASE_URL);
-console.log("[env.ts] VITE_SUPABASE_URL existe:", !!import.meta.env.VITE_SUPABASE_URL);
-console.log("[env.ts] VITE_SUPABASE_PUBLISHABLE_KEY existe:", !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
-console.log("[env.ts] VITE_SUPABASE_PROJECT_ID existe:", !!import.meta.env.VITE_SUPABASE_PROJECT_ID);
-
 const parsed = envSchema.safeParse({
   VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
   VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
@@ -23,12 +17,8 @@ const parsed = envSchema.safeParse({
 if (!parsed.success) {
   // Throw a clear error early in runtime (and fail build in SSR contexts)
   const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-  console.error("[env.ts] Erro na validação:", issues);
   throw new Error(`Invalid environment configuration: ${issues}`);
 }
-
-console.log("[env.ts] Variáveis validadas com sucesso");
-console.log("[env.ts] BASE_URL final:", parsed.data.BASE_URL);
 
 export const env = parsed.data;
 
